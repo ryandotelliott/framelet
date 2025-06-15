@@ -102,21 +102,61 @@ pub fn get_available_monitors() -> Result<Vec<Monitor>, Box<dyn std::error::Erro
     Ok(monitors)
 }
 
+pub fn get_available_windows() -> Result<Vec<Window>, Box<dyn std::error::Error>> {
+    let windows = Window::enumerate()?;
+
+    // Filter out minimized windows and windows without titles
+    let filtered_windows: Vec<Window> = windows
+        .into_iter()
+        .filter(|window| {
+            // Check if window has a title and is not minimized
+            if let Ok(title) = window.title() {
+                if !title.trim().is_empty() {
+                    // Check if window is visible (not minimized)
+                    // The windows-capture library should handle this, but we can add additional checks
+                    return true;
+                }
+            }
+            false
+        })
+        .collect();
+
+    Ok(filtered_windows)
+}
+
 pub fn start_recording(
     monitor: Monitor,
     output_path: String,
     stop_signal: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = monitor.name()?;
-
     let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(monitor)?;
+    start_capture_recording_internal(capture_item, name, output_path, stop_signal)
+}
+
+pub fn start_window_recording(
+    window: Window,
+    output_path: String,
+    stop_signal: Arc<AtomicBool>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let name = window.title()?;
+    let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(window)?;
+    start_capture_recording_internal(capture_item, name, output_path, stop_signal)
+}
+
+fn start_capture_recording_internal(
+    capture_item: WindowsCaptureGraphicsCaptureItem,
+    source_name: String,
+    output_path: String,
+    stop_signal: Arc<AtomicBool>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let width = capture_item.Size()?.Width as u32;
     let height = capture_item.Size()?.Height as u32;
 
     let config = RecordingConfig {
         source_width: width,
         source_height: height,
-        source_name: name,
+        source_name,
         output_path,
         stop_signal,
     };

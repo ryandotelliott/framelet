@@ -4,39 +4,49 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
-interface MonitorInfo {
+interface CaptureSource {
   id: number;
   name: string;
   width: number;
   height: number;
+  source_type: string;
 }
 
 function Home() {
-  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
-  const [selectedMonitor, setSelectedMonitor] = useState<number>(0);
+  const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
+  const [selectedSource, setSelectedSource] = useState<number>(0);
   const [outputPath, setOutputPath] = useState('recording.mp4');
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('');
+  const [isLoadingSources, setIsLoadingSources] = useState(false);
 
   useEffect(() => {
-    loadMonitors();
+    loadCaptureSources();
   }, []);
 
-  async function loadMonitors() {
+  async function loadCaptureSources() {
+    setIsLoadingSources(true);
     try {
-      const monitorList = await invoke<MonitorInfo[]>('get_monitors');
-      setMonitors(monitorList);
+      const sources = await invoke<CaptureSource[]>('get_capture_sources');
+      setCaptureSources(sources);
+      if (sources.length > 0) {
+        setSelectedSource(sources[0].id);
+      }
+      setStatus('');
     } catch (error) {
-      setStatus(`Error loading monitors: ${error}`);
+      setStatus(`Error loading capture sources: ${error}`);
+    } finally {
+      setIsLoadingSources(false);
     }
   }
 
   async function startRecording() {
     try {
       setStatus('Starting recording...');
-      const result = await invoke<string>('start_recording', {
-        monitorId: selectedMonitor,
+      const result = await invoke<string>('start_capture_recording', {
+        sourceId: selectedSource,
         outputPath: outputPath,
       });
       setStatus(result);
@@ -57,33 +67,66 @@ function Home() {
     }
   }
 
-  return (
-    <div className="flex flex-col h-screen gap-y-4">
-      <h1 className="text-2xl font-bold">Screen Recorder</h1>
+  const selectedSourceInfo = captureSources.find((source) => source.id === selectedSource);
 
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="monitor-select">Select Monitor:</Label>
+  return (
+    <div className="flex flex-col h-screen gap-y-4 p-6">
+      <h1 className="text-3xl font-bold">Screen Recorder</h1>
+      <p className="text-muted-foreground">Record your screen or capture specific application windows</p>
+
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="source-select">Select Capture Source:</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadCaptureSources}
+              disabled={isRecording || isLoadingSources}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoadingSources ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
+
           <Select
-            name="monitor-select"
-            value={selectedMonitor.toString()}
-            onValueChange={(value) => setSelectedMonitor(parseInt(value))}
-            disabled={isRecording}
+            name="source-select"
+            value={selectedSource.toString()}
+            onValueChange={(value) => setSelectedSource(parseInt(value))}
+            disabled={isRecording || isLoadingSources}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select Monitor" />
+              <SelectValue placeholder="Select a monitor or window to record" />
             </SelectTrigger>
             <SelectContent>
-              {monitors.map((monitor) => (
-                <SelectItem key={monitor.id} value={monitor.id.toString()}>
-                  {monitor.name} ({monitor.width}x{monitor.height})
+              {captureSources.map((source) => (
+                <SelectItem key={source.id} value={source.id.toString()}>
+                  <div className="flex items-center gap-2">
+                    <span>{source.name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      ({source.width}x{source.height})
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          {selectedSourceInfo && (
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="text-sm">
+                <strong>Selected:</strong> {selectedSourceInfo.name}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Resolution: {selectedSourceInfo.width}x{selectedSourceInfo.height} | Type:{' '}
+                {selectedSourceInfo.source_type === 'monitor' ? 'Monitor' : 'Application Window'}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <Label htmlFor="output-path">Output File:</Label>
           <Input
             name="output-path"
@@ -92,22 +135,58 @@ function Home() {
             onChange={(event) => setOutputPath(event.target.value)}
             disabled={isRecording}
             placeholder="recording.mp4"
+            className="font-mono"
           />
+          <p className="text-sm text-muted-foreground">
+            Specify the path and filename for your recording. Supports .mp4, .avi, and other video formats.
+          </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {!isRecording ? (
-            <Button onClick={startRecording} disabled={monitors.length === 0} className="start-button">
-              Start Recording
+            <Button
+              onClick={startRecording}
+              disabled={captureSources.length === 0 || isLoadingSources}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              size="lg"
+            >
+              🔴 Start Recording
             </Button>
           ) : (
-            <Button onClick={stopRecording} className="stop-button">
-              Stop Recording
+            <Button onClick={stopRecording} className="bg-gray-600 hover:bg-gray-700 text-white" size="lg">
+              ⏹️ Stop Recording
             </Button>
           )}
         </div>
 
-        {status && <div className={`status ${isRecording ? 'recording' : ''}`}>{status}</div>}
+        {status && (
+          <div
+            className={`p-3 rounded-lg ${
+              isRecording
+                ? 'bg-red-50 text-red-800 border border-red-200'
+                : status.includes('Error')
+                  ? 'bg-red-50 text-red-800 border border-red-200'
+                  : 'bg-green-50 text-green-800 border border-green-200'
+            }`}
+          >
+            {status}
+          </div>
+        )}
+
+        {captureSources.length === 0 && !isLoadingSources && (
+          <div className="p-4 bg-yellow-50 text-yellow-800 border border-yellow-200 rounded-lg">
+            <p className="font-medium">No capture sources available</p>
+            <p className="text-sm">
+              Make sure you have monitors connected or applications running, then click Refresh.
+            </p>
+          </div>
+        )}
+
+        {isLoadingSources && (
+          <div className="p-4 bg-blue-50 text-blue-800 border border-blue-200 rounded-lg">
+            <p>Loading available capture sources...</p>
+          </div>
+        )}
       </div>
     </div>
   );
