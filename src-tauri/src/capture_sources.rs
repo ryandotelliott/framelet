@@ -1,28 +1,55 @@
 use crate::screen_recorder;
 use crate::types::{CaptureSource, CaptureSourceType, MonitorInfo, WindowInfo};
-use windows_capture::{window::Window, WindowsCaptureGraphicsCaptureItem};
+use serde::Serialize;
+use thiserror::Error;
+use windows_capture::monitor::Monitor;
+use windows_capture::WindowsCaptureGraphicsCaptureItem;
 
 pub struct CaptureSourceManager;
 
+#[derive(Debug, Error)]
+pub enum CaptureSourceError {
+    #[error("failed to list monitors: {0}")]
+    ListMonitors(#[source] windows_capture::monitor::Error),
+
+    #[error("failed to list windows: {0}")]
+    ListWindows(#[source] Box<dyn std::error::Error>),
+}
+
+impl Serialize for CaptureSourceError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
 impl CaptureSourceManager {
-    pub fn get_monitors() -> Result<Vec<MonitorInfo>, String> {
-        let monitors = screen_recorder::get_available_monitors()
-            .map_err(|e| format!("Failed to get monitors: {}", e))?;
+    pub fn get_monitors() -> Result<Vec<MonitorInfo>, CaptureSourceError> {
+        let monitors = Monitor::enumerate().map_err(CaptureSourceError::ListMonitors)?;
 
         let mut monitor_info = Vec::new();
         for (id, monitor) in monitors.iter().enumerate() {
-            let name = monitor
-                .name()
-                .map_err(|e| format!("Failed to get monitor name: {}", e))?;
-            let width = monitor
-                .width()
-                .map_err(|e| format!("Failed to get monitor width: {}", e))?;
-            let height = monitor
-                .height()
-                .map_err(|e| format!("Failed to get monitor height: {}", e))?;
+            let hmonitor = monitor.as_raw_hmonitor() as isize;
+
+            let name = match monitor.name() {
+                Ok(n) if !n.trim().is_empty() => n,
+                _ => continue,
+            };
+
+            let width = match monitor.width() {
+                Ok(w) => w,
+                _ => continue,
+            };
+            let height = match monitor.height() {
+                Ok(h) => h,
+                _ => continue,
+            };
 
             monitor_info.push(MonitorInfo {
                 id,
+                hmonitor,
                 name,
                 width,
                 height,
@@ -32,143 +59,75 @@ impl CaptureSourceManager {
         Ok(monitor_info)
     }
 
-    pub fn get_windows() -> Result<Vec<WindowInfo>, String> {
+    pub fn get_windows() -> Result<Vec<WindowInfo>, CaptureSourceError> {
         let windows = screen_recorder::get_available_windows()
-            .map_err(|e| format!("Failed to get windows: {}", e))?;
+            .map_err(|e| CaptureSourceError::ListWindows(e))?;
 
         let mut window_info = Vec::new();
         for (id, window) in windows.iter().enumerate() {
-            let title = window
-                .title()
-                .map_err(|e| format!("Failed to get window title: {}", e))?;
+            if !window.is_valid() {
+                continue;
+            }
 
-            // Get HWND
-            let hwnd = Self::get_window_hwnd(window)
-                .map_err(|e| format!("Failed to get window HWND: {}", e))?;
+            let title = match window.title() {
+                Ok(t) if !t.trim().is_empty() => t,
+                _ => continue,
+            };
 
-            // Get dimensions by converting to capture item
-            let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(window.clone())
-                .map_err(|e| format!("Failed to create capture item: {}", e))?;
-            let width = capture_item
-                .Size()
-                .map_err(|e| format!("Failed to get window size: {}", e))?
-                .Width as u32;
-            let height = capture_item
-                .Size()
-                .map_err(|e| format!("Failed to get window size: {}", e))?
-                .Height as u32;
+            let hwnd = window.as_raw_hwnd() as isize;
+
+            let capture_item = match WindowsCaptureGraphicsCaptureItem::try_from(window.clone()) {
+                Ok(item) => item,
+                Err(_) => continue,
+            };
+
+            let size = match capture_item.Size() {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+
+            let width = size.Width as u32;
+            let height = size.Height as u32;
 
             window_info.push(WindowInfo {
                 id,
+                hwnd,
                 title,
                 width,
                 height,
-                hwnd,
             });
         }
 
         Ok(window_info)
     }
 
-    pub fn get_all_capture_sources() -> Result<Vec<CaptureSource>, String> {
-        println!("Starting get_all_capture_sources");
+    pub fn get_all_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
         let mut sources = Vec::new();
-        let mut id_counter = 0;
 
         // Add monitors
-        println!("Getting monitors...");
-        let monitors = screen_recorder::get_available_monitors().map_err(|e| {
-            let error_msg = format!("Failed to get monitors: {}", e);
-            println!("{}", error_msg);
-            error_msg
-        })?;
-
+        let monitors = Self::get_monitors()?;
         println!("Found {} monitors", monitors.len());
 
-        for monitor in monitors.iter() {
-            let name = monitor
-                .name()
-                .map_err(|e| format!("Failed to get monitor name: {}", e))?;
-            let width = monitor
-                .width()
-                .map_err(|e| format!("Failed to get monitor width: {}", e))?;
-            let height = monitor
-                .height()
-                .map_err(|e| format!("Failed to get monitor height: {}", e))?;
+        sources.extend(monitors.into_iter().map(|monitor| CaptureSource {
+            name: monitor.name,
+            width: monitor.width,
+            height: monitor.height,
+            source_type: CaptureSourceType::Monitor,
+            handle: monitor.hmonitor,
+        }));
 
-            println!("Adding monitor: {} ({}x{})", name, width, height);
-            sources.push(CaptureSource {
-                id: id_counter,
-                name: format!("🖥️ {}", name),
-                width,
-                height,
-                source_type: CaptureSourceType::Monitor,
-            });
-            id_counter += 1;
-        }
+        let windows = Self::get_windows()?;
+        println!("Found {} windows", windows.len());
 
-        println!("Getting windows...");
-        match screen_recorder::get_available_windows() {
-            Ok(windows) => {
-                println!("Found {} windows", windows.len());
-                for window in windows.iter() {
-                    match Self::process_window(window, id_counter) {
-                        Ok(source) => {
-                            println!("Adding window: {}", source.name);
-                            sources.push(source);
-                            id_counter += 1;
-                        }
-                        Err(e) => {
-                            println!("Skipping window due to error: {}", e);
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                println!("Warning: Failed to get windows: {}", e);
-                // Don't fail completely, just continue without windows
-            }
-        }
+        sources.extend(windows.into_iter().map(|window| CaptureSource {
+            name: window.title,
+            width: window.width,
+            height: window.height,
+            source_type: CaptureSourceType::Window,
+            handle: window.hwnd,
+        }));
 
         println!("Total sources found: {}", sources.len());
         Ok(sources)
-    }
-
-    fn process_window(window: &Window, id: usize) -> Result<CaptureSource, String> {
-        let title = window
-            .title()
-            .map_err(|e| format!("Failed to get window title: {}", e))?;
-
-        // Get dimensions by converting to capture item
-        let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(window.clone())
-            .map_err(|e| format!("Failed to create capture item: {}", e))?;
-        let width = capture_item
-            .Size()
-            .map_err(|e| format!("Failed to get window size: {}", e))?
-            .Width as u32;
-        let height = capture_item
-            .Size()
-            .map_err(|e| format!("Failed to get window size: {}", e))?
-            .Height as u32;
-
-        Ok(CaptureSource {
-            id,
-            name: format!("🪟 {}", title),
-            width,
-            height,
-            source_type: CaptureSourceType::Window,
-        })
-    }
-
-    fn get_window_hwnd(window: &Window) -> Result<isize, Box<dyn std::error::Error>> {
-        // For now, we'll use a hash of the window title as a unique identifier
-        // In a full implementation, you would use Windows API to get the actual HWND
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
-
-        let title = window.title()?;
-        let mut hasher = DefaultHasher::new();
-        title.hash(&mut hasher);
-        Ok(hasher.finish() as isize)
     }
 }

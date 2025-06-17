@@ -12,7 +12,6 @@ use windows_capture::{
     encoder::{AudioSettingsBuilder, ContainerSettingsBuilder, VideoEncoder, VideoSettingsBuilder},
     frame::Frame,
     graphics_capture_api::InternalCaptureControl,
-    monitor::Monitor,
     settings::{ColorFormat, CursorCaptureSettings, DrawBorderSettings, Settings},
     window::Window,
     WindowsCaptureGraphicsCaptureItem,
@@ -22,9 +21,8 @@ use windows_capture::{
 
 #[derive(Debug, Clone)]
 pub struct RecordingConfig {
-    pub source_width: u32,
-    pub source_height: u32,
-    pub source_name: String,
+    pub width: u32,
+    pub height: u32,
     pub output_path: String,
     pub stop_signal: Arc<AtomicBool>,
 }
@@ -41,16 +39,11 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
     type Error = Box<dyn std::error::Error + Send + Sync>;
 
     fn new(ctx: Context<Self::Flags>) -> Result<Self, Self::Error> {
-        println!("Starting recording on: {}", ctx.flags.source_name);
-        println!(
-            "Using dimensions: {}x{}",
-            ctx.flags.source_width, ctx.flags.source_height
-        );
+        println!("Using dimensions: {}x{}", ctx.flags.width, ctx.flags.height);
         println!("Output file: {}", ctx.flags.output_path);
-        println!("Press Ctrl+C or any key to stop recording...");
 
         let encoder = VideoEncoder::new(
-            VideoSettingsBuilder::new(ctx.flags.source_width, ctx.flags.source_height),
+            VideoSettingsBuilder::new(ctx.flags.width, ctx.flags.height),
             AudioSettingsBuilder::default().disabled(true),
             ContainerSettingsBuilder::default(),
             &ctx.flags.output_path,
@@ -97,11 +90,6 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
     }
 }
 
-pub fn get_available_monitors() -> Result<Vec<Monitor>, Box<dyn std::error::Error>> {
-    let monitors = Monitor::enumerate()?;
-    Ok(monitors)
-}
-
 pub fn get_available_windows() -> Result<Vec<Window>, Box<dyn std::error::Error>> {
     let windows = Window::enumerate()?;
 
@@ -125,28 +113,7 @@ pub fn get_available_windows() -> Result<Vec<Window>, Box<dyn std::error::Error>
 }
 
 pub fn start_recording(
-    monitor: Monitor,
-    output_path: String,
-    stop_signal: Arc<AtomicBool>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let name = monitor.name()?;
-    let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(monitor)?;
-    start_capture_recording_internal(capture_item, name, output_path, stop_signal)
-}
-
-pub fn start_window_recording(
-    window: Window,
-    output_path: String,
-    stop_signal: Arc<AtomicBool>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let name = window.title()?;
-    let capture_item = WindowsCaptureGraphicsCaptureItem::try_from(window)?;
-    start_capture_recording_internal(capture_item, name, output_path, stop_signal)
-}
-
-fn start_capture_recording_internal(
     capture_item: WindowsCaptureGraphicsCaptureItem,
-    source_name: String,
     output_path: String,
     stop_signal: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -154,9 +121,8 @@ fn start_capture_recording_internal(
     let height = capture_item.Size()?.Height as u32;
 
     let config = RecordingConfig {
-        source_width: width,
-        source_height: height,
-        source_name,
+        width,
+        height,
         output_path,
         stop_signal,
     };

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { RefreshCw } from 'lucide-react';
 
 interface CaptureSource {
-  id: number;
+  handle: number;
   name: string;
   width: number;
   height: number;
@@ -32,7 +32,7 @@ function Home() {
       const sources = await invoke<CaptureSource[]>('get_capture_sources');
       setCaptureSources(sources);
       if (sources.length > 0) {
-        setSelectedSource(sources[0].id);
+        setSelectedSource(sources[0].handle);
       }
       setStatus('');
     } catch (error) {
@@ -43,11 +43,17 @@ function Home() {
   }
 
   async function startRecording() {
+    const source = captureSources.find((s) => s.handle === selectedSource);
+    if (!source) {
+      setStatus('Error: no capture source selected');
+      return;
+    }
     try {
       setStatus('Starting recording...');
-      const result = await invoke<string>('start_capture_recording', {
-        sourceId: selectedSource,
-        outputPath: outputPath,
+      const result = await invoke<string>('start_recording', {
+        handle: source.handle,
+        sourceType: source.source_type,
+        outputPath,
       });
       setStatus(result);
       setIsRecording(true);
@@ -67,7 +73,7 @@ function Home() {
     }
   }
 
-  const selectedSourceInfo = captureSources.find((source) => source.id === selectedSource);
+  const selectedSourceInfo = captureSources.find((source) => source.handle === selectedSource);
 
   return (
     <div className="flex flex-col h-screen gap-y-4 p-6">
@@ -101,7 +107,7 @@ function Home() {
             </SelectTrigger>
             <SelectContent>
               {captureSources.map((source) => (
-                <SelectItem key={source.id} value={source.id.toString()}>
+                <SelectItem key={source.handle} value={source.handle.toString()}>
                   <div className="flex items-center gap-2">
                     <span>{source.name}</span>
                     <span className="text-sm text-muted-foreground">

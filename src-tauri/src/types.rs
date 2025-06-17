@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MonitorInfo {
     pub id: usize,
+    pub hmonitor: isize,
     pub name: String,
     pub width: u32,
     pub height: u32,
@@ -11,10 +12,10 @@ pub struct MonitorInfo {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub id: usize,
+    pub hwnd: isize,
     pub title: String,
     pub width: u32,
     pub height: u32,
-    pub hwnd: isize, // Windows handle
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,9 +27,9 @@ pub enum CaptureSourceType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CaptureSource {
-    pub id: usize,
     pub name: String,
     pub width: u32,
     pub height: u32,
     pub source_type: CaptureSourceType,
+    pub handle: isize, // HWND or HMONITOR
 }

@@ -7,54 +7,41 @@ mod types;
 
 use capture_manager::CaptureManager;
 use capture_sources::CaptureSourceManager;
-use types::{CaptureSource, MonitorInfo, WindowInfo};
+use types::CaptureSource;
+use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
+
+use crate::{capture_sources::CaptureSourceError, types::CaptureSourceType};
+
+// TODO: Need to clean up error handling to not just use format.
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
-async fn get_monitors() -> Result<Vec<MonitorInfo>, String> {
-    CaptureSourceManager::get_monitors()
-}
-
-#[tauri::command]
-async fn get_windows() -> Result<Vec<WindowInfo>, String> {
-    CaptureSourceManager::get_windows()
-}
-
-#[tauri::command]
-async fn get_capture_sources() -> Result<Vec<CaptureSource>, String> {
+async fn get_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
     CaptureSourceManager::get_all_capture_sources()
 }
 
 #[tauri::command]
-async fn start_capture_recording(source_id: usize, output_path: String) -> Result<String, String> {
-    let monitors = screen_recorder::get_available_monitors()
-        .map_err(|e| format!("Failed to get monitors: {}", e))?;
-    let windows = screen_recorder::get_available_windows()
-        .map_err(|e| format!("Failed to get windows: {}", e))?;
-
-    // Determine if we're recording a monitor or window
-    if source_id < monitors.len() {
-        // Recording a monitor
-        let monitor = monitors[source_id].clone();
-        CaptureManager::start_capture_session(move |stop_signal| {
-            screen_recorder::start_recording(monitor, output_path, stop_signal)
-        })
-    } else {
-        // Recording a window
-        let window_id = source_id - monitors.len();
-        if window_id >= windows.len() {
-            return Err("Invalid source ID".to_string());
+async fn start_recording(
+    handle: isize,
+    source_type: CaptureSourceType,
+    output_path: String,
+) -> Result<String, String> {
+    let item = match source_type {
+        CaptureSourceType::Monitor => {
+            let monitor = Monitor::from_raw_hmonitor(handle as *mut _);
+            WindowsCaptureGraphicsCaptureItem::try_from(monitor)
+                .map_err(|e| format!("Failed to create capture item: {}", e))?
         }
+        CaptureSourceType::Window => {
+            let win = Window::from_raw_hwnd(handle as *mut _);
+            WindowsCaptureGraphicsCaptureItem::try_from(win)
+                .map_err(|e| format!("Failed to create capture item: {}", e))?
+        }
+    };
 
-        let window = windows[window_id].clone();
-        CaptureManager::start_capture_session(move |stop_signal| {
-            screen_recorder::start_window_recording(window, output_path, stop_signal)
-        })
-    }
+    // start recording exactly once
+    CaptureManager::start_capture_session(move |stop_signal| {
+        screen_recorder::start_recording(item, output_path, stop_signal)
+    })
 }
 
 #[tauri::command]
@@ -67,11 +54,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
-            get_monitors,
-            get_windows,
             get_capture_sources,
-            start_capture_recording,
+            start_recording,
             stop_recording
         ])
         .run(tauri::generate_context!())
