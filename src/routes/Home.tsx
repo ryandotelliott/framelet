@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { FolderOpen, RefreshCw } from 'lucide-react';
+import { save } from '@tauri-apps/plugin-dialog';
 
 interface CaptureSource {
   handle: number;
@@ -143,6 +144,21 @@ function Home() {
             placeholder="recording.mp4"
             className="font-mono"
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              const result = await save({
+                filters: [{ name: 'Video', extensions: ['mp4'] }],
+              });
+              if (result) {
+                setOutputPath(result);
+              }
+            }}
+          >
+            <FolderOpen className="h-4 w-4" />
+            Browse
+          </Button>
           <p className="text-sm text-muted-foreground">
             Specify the path and filename for your recording. Supports .mp4, .avi, and other video formats.
           </p>
@@ -156,11 +172,11 @@ function Home() {
               className="bg-red-600 hover:bg-red-700 text-white"
               size="lg"
             >
-              🔴 Start Recording
+              Start Recording
             </Button>
           ) : (
             <Button onClick={stopRecording} className="bg-gray-600 hover:bg-gray-700 text-white" size="lg">
-              ⏹️ Stop Recording
+              Stop Recording
             </Button>
           )}
         </div>
