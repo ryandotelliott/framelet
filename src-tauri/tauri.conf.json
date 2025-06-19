@@ -10,11 +10,16 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
+        "fullscreen": false,
+        "resizable": true,
         "title": "Framelet",
         "width": 1000,
         "height": 800,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "decorations": false
       }
     ],

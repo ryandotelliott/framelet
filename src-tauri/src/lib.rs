@@ -9,13 +9,15 @@ use std::{
     },
     thread,
 };
-use tauri::State;
+use tauri::{Manager, State};
 
-use capture_sources::CaptureSourceManager;
-use types::CaptureSource;
-use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
+use tauri_plugin_decorum::WebviewWindowExt;
 
 use crate::{capture_sources::CaptureSourceError, types::CaptureSourceType};
+use capture_sources::CaptureSourceManager;
+use types::CaptureSource;
+
+use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
 
 #[tauri::command]
 async fn get_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
@@ -92,12 +94,24 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_decorum::init())
         .manage(Mutex::new(None::<RecordingSession>))
         .invoke_handler(tauri::generate_handler![
             get_capture_sources,
             start_recording,
             stop_recording
         ])
+        .setup(|app| {
+            // Create a custom titlebar for main window using https://github.com/clearlysid/tauri-plugin-decorum/
+            // On Windows this will hide decoration and render custom window controls
+            // On macOS it expects a hiddenTitle: true and titleBarStyle: overlay
+            let main_window = app.get_webview_window("main").unwrap();
+            main_window.create_overlay_titlebar().unwrap();
+
+            #[cfg(target_os = "macos")]
+            main_window.set_traffic_lights_inset(16.0, 20.0).unwrap();
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
