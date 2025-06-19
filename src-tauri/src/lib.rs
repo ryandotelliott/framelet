@@ -1,5 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-
 mod capture_sources;
 mod screen_recorder;
 mod types;

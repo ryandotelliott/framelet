@@ -14,7 +14,8 @@
       {
         "title": "Framelet",
         "width": 1000,
-        "height": 800
+        "height": 800,
+        "decorations": false
       }
     ],
     "security": {
