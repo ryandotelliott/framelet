@@ -16,8 +16,10 @@
         "fullscreen": false,
         "resizable": true,
         "title": "Framelet",
-        "width": 1000,
-        "height": 800,
+        "width": 1300,
+        "height": 950,
+        "minWidth": 800,
+        "minHeight": 550,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
         "decorations": false

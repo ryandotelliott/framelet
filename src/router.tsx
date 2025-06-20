@@ -1,5 +1,6 @@
-import { createRouter, createRoute, createRootRoute, Outlet, Link } from '@tanstack/react-router';
-import Home from './routes/Home';
+import { createRouter, createRoute, createRootRoute } from '@tanstack/react-router';
+import RecordPage from './routes/record';
+import App from './app';
 
 // Register the router instance for type safety
 declare module '@tanstack/react-router' {
@@ -9,26 +10,13 @@ declare module '@tanstack/react-router' {
 }
 
 const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <div id="app">
-        <nav className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-          <Link to="/" className="text-2xl font-bold">
-            Framelet
-          </Link>
-        </nav>
-        <div className="p-4">
-          <Outlet />
-        </div>
-      </div>
-    </>
-  ),
+  component: App,
 });
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: Home,
+  component: RecordPage,
 });
 
 const routeTree = rootRoute.addChildren([indexRoute]);

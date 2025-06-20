@@ -118,3 +118,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+button.decorum-tb-btn {
+  &:hover {
+    background-color: var(--accent);
+  }
+}
