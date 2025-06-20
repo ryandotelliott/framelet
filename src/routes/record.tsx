@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { CameraIcon, FolderOpen, Monitor, RefreshCw, VideoIcon } from 'lucide-react';
+import { CameraIcon, FolderOpen, Monitor, RefreshCw, VideoIcon, VideoOff } from 'lucide-react';
 import { save } from '@tauri-apps/plugin-dialog';
 
 interface CaptureSource {
@@ -83,19 +83,42 @@ export default function RecordPage() {
           <div className="aspect-video rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center relative overflow-hidden w-full max-w-2xl">
             <div className="text-center">
               <div className="w-16 h-16 bg-white/10 rounded-lg mb-4 mx-auto flex items-center justify-center">
-                <Monitor className="w-8 h-8 text-white/40" />
+                <Monitor className="w-8 h-8 text-white opacity-40" />
               </div>
-              <p className="text-white/60 text-lg mb-2">Screen Preview</p>
-              <p className="text-white/40 text-sm">Your screen content will appear here</p>
+              <p className="text-white/60 text-lg mb-2">Source Preview</p>
+              <p className="text-white/40 text-sm">Your source content will appear here</p>
               <p className="text-white/40 text-xs mt-1">Select a source and start recording</p>
             </div>
           </div>
-          <Button variant="default" size="lg">
-            <VideoIcon />
-            Start Recording
-          </Button>
+          <div className="flex gap-x-4">
+            <Button
+              variant="outline"
+              disabled={isLoadingSources || !selectedSourceInfo}
+              onClick={isRecording ? stopRecording : startRecording}
+            >
+              {isRecording ? <VideoOff /> : <VideoIcon />}
+              {isRecording ? 'Stop Recording' : 'Start Recording'}
+            </Button>
+            <Select
+              onValueChange={(value) => setSelectedSource(Number(value))}
+              value={selectedSource.toString()}
+              disabled={isLoadingSources || isRecording}
+            >
+              <SelectTrigger>
+                <Monitor />
+                {`${selectedSourceInfo?.name.slice(0, 20)} (${selectedSourceInfo?.width}x${selectedSourceInfo?.height})` ||
+                  'Select Source'}
+              </SelectTrigger>
+              <SelectContent>
+                {captureSources.map((source) => (
+                  <SelectItem key={source.handle} value={source.handle.toString()}>
+                    {source.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="h-full w-full max-w-xs rounded-lg bg-card"></div>
       </div>
     </div>
   );
