@@ -97,7 +97,7 @@ async fn open_region_selector(app: tauri::AppHandle) -> Result<(), String> {
     let _docs_window = tauri::WebviewWindowBuilder::new(
         &app,
         "region-selector",
-        tauri::WebviewUrl::App("region-selector.html".into()),
+        tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
     )
     .title("Region Selector")
     .fullscreen(true)

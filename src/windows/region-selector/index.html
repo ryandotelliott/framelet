@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Region Selector</title>
+    <link rel="stylesheet" href="../../global.css" />
+  </head>
+  <body class="m-0 p-0 bg-black/30 overflow-hidden w-screen h-screen cursor-crosshair select-none font-sans">
+    <div
+      id="instructions"
+      class="fixed top-5 left-1/2 -translate-x-1/2 bg-black/80 text-white px-5 py-2 rounded text-sm z-[1000]"
+    >
+      Click and drag to select a region, or press ESC to cancel
+    </div>
+
+    <button
+      id="cancel-btn"
+      class="fixed top-5 right-5 bg-red-600/80 text-white px-3 py-2 rounded text-sm hover:bg-red-600"
+    >
+      Cancel
+    </button>
+
+    <div
+      id="selection-overlay"
+      class="absolute border-2 border-blue-600 bg-blue-600/10 pointer-events-none hidden"
+    ></div>
+    <div
+      id="coordinates"
+      class="fixed bottom-5 left-5 bg-black/80 text-white px-2 py-1 rounded text-xs font-mono hidden"
+    ></div>
+
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>
