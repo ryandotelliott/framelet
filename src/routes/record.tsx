@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { listen } from '@tauri-apps/api/event';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { CameraIcon, FolderOpen, Monitor, RefreshCw, VideoIcon, VideoOff } from 'lucide-react';
-import { save } from '@tauri-apps/plugin-dialog';
+import { CropIcon, Monitor, VideoIcon, VideoOff } from 'lucide-react';
 
 interface CaptureSource {
   handle: number;
@@ -15,6 +13,13 @@ interface CaptureSource {
   source_type: string;
 }
 
+interface RegionCoordinates {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<number>(0);
@@ -22,9 +27,23 @@ export default function RecordPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState<RegionCoordinates | null>(null);
 
   useEffect(() => {
     loadCaptureSources();
+
+    // Listen for region selection events
+    const unlistenRegionSelected = listen<RegionCoordinates>('region-selected', (event) => {
+      console.log('Region selected:', event.payload);
+      setSelectedRegion(event.payload);
+      setStatus(
+        `Region selected: ${event.payload.width}x${event.payload.height} at (${event.payload.x}, ${event.payload.y})`,
+      );
+    });
+
+    return () => {
+      unlistenRegionSelected.then((unlisten) => unlisten());
+    };
   }, []);
 
   async function loadCaptureSources() {
@@ -74,22 +93,35 @@ export default function RecordPage() {
     }
   }
 
+  async function openRegionSelector() {
+    try {
+      await invoke('open_region_selector');
+      setStatus('Region selector opened - click and drag to select an area');
+    } catch (error) {
+      setStatus(`Error opening region selector: ${error}`);
+    }
+  }
+
   const selectedSourceInfo = captureSources.find((source) => source.handle === selectedSource);
 
   return (
     <div className="flex flex-col h-screen gap-y-4 pt-10 px-6 pb-6">
       <div className="flex gap-x-4 h-full w-full items-center justify-center">
         <div className="w-full h-full flex flex-col gap-y-4 items-center justify-center">
-          <div className="aspect-video rounded-lg border-2 border-dashed border-white/20 flex items-center justify-center relative overflow-hidden w-full max-w-2xl">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-white/10 rounded-lg mb-4 mx-auto flex items-center justify-center">
-                <Monitor className="w-8 h-8 text-white opacity-40" />
-              </div>
-              <p className="text-white/60 text-lg mb-2">Source Preview</p>
-              <p className="text-white/40 text-sm">Your source content will appear here</p>
-              <p className="text-white/40 text-xs mt-1">Select a source and start recording</p>
+          <div className="text-center">
+            <div className="w-16 h-16 bg-white/10 rounded-lg mb-4 mx-auto flex items-center justify-center">
+              <Monitor className="w-8 h-8 text-white opacity-40" />
             </div>
+            <p className="text-white/60 text-lg mb-2">Ready to Record</p>
+            <p className="text-white/40 text-xs mt-1">Select a source and start recording</p>
+            {selectedRegion && (
+              <p className="text-green-400 text-xs mt-2">
+                Selected region: {selectedRegion.width}x{selectedRegion.height} at ({selectedRegion.x},{' '}
+                {selectedRegion.y})
+              </p>
+            )}
           </div>
+
           <div className="flex gap-x-4">
             <Button
               variant="outline"
@@ -117,8 +149,17 @@ export default function RecordPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" onClick={openRegionSelector} disabled={isRecording}>
+              <CropIcon />
+              Select Region
+            </Button>
           </div>
+
+          {status && (
+            <div className="mt-4 p-2 bg-white/10 rounded text-white/80 text-sm max-w-md text-center">{status}</div>
+          )}
         </div>
+        {/* Maybe sidebar here? */}
       </div>
     </div>
   );

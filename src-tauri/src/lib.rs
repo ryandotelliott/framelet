@@ -9,7 +9,7 @@ use std::{
     },
     thread,
 };
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 use tauri_plugin_decorum::WebviewWindowExt;
 
@@ -18,6 +18,14 @@ use capture_sources::CaptureSourceManager;
 use types::CaptureSource;
 
 use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RegionCoordinates {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
 
 #[tauri::command]
 async fn get_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
@@ -84,6 +92,56 @@ async fn stop_recording(
     }
 }
 
+#[tauri::command]
+async fn open_region_selector(app: tauri::AppHandle) -> Result<(), String> {
+    let _docs_window = tauri::WebviewWindowBuilder::new(
+        &app,
+        "region-selector",
+        tauri::WebviewUrl::App("region-selector.html".into()),
+    )
+    .title("Region Selector")
+    .fullscreen(true)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .resizable(false)
+    .build()
+    .map_err(|e| format!("Failed to create region selector window: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("region-selector") {
+        window
+            .close()
+            .map_err(|e| format!("Failed to close region selector: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn region_selected(
+    app: tauri::AppHandle,
+    coordinates: RegionCoordinates,
+) -> Result<(), String> {
+    println!("Region selected: {:?}", coordinates);
+
+    // Emit an event to the main window with the selected coordinates
+    app.emit("region-selected", &coordinates)
+        .map_err(|e| format!("Failed to emit region-selected event: {}", e))?;
+
+    // Close the region selector window
+    if let Some(window) = app.get_webview_window("region-selector") {
+        window
+            .close()
+            .map_err(|e| format!("Failed to close region selector: {}", e))?;
+    }
+
+    Ok(())
+}
+
 struct RecordingSession {
     stop_signal: Arc<AtomicBool>,
     recording_thread: Option<thread::JoinHandle<()>>,
@@ -99,7 +157,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_capture_sources,
             start_recording,
-            stop_recording
+            stop_recording,
+            open_region_selector,
+            close_region_selector,
+            region_selected
         ])
         .setup(|app| {
             // Create a custom titlebar for main window using https://github.com/clearlysid/tauri-plugin-decorum/
