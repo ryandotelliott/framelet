@@ -90,7 +90,6 @@ async fn stop_recording(
 
 #[tauri::command]
 async fn open_region_selector(app: tauri::AppHandle, monitor_handle: isize) -> Result<(), String> {
-    use tauri::{PhysicalPosition, PhysicalSize, Position, Size};
     use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
 
     // Retrieve rectangle directly from the HMONITOR
@@ -102,23 +101,30 @@ async fn open_region_selector(app: tauri::AppHandle, monitor_handle: isize) -> R
     };
 
     if unsafe { GetMonitorInfoW(hmonitor, &mut mi) }.as_bool() {
-        let left = mi.rcMonitor.left;
-        let top = mi.rcMonitor.top;
-        let width = (mi.rcMonitor.right - mi.rcMonitor.left) as u32;
-        let height = (mi.rcMonitor.bottom - mi.rcMonitor.top) as u32;
+        let left = mi.rcMonitor.left as f64;
+        let top = mi.rcMonitor.top as f64;
 
-        let window = app
-            .get_webview_window("region-selector")
-            .ok_or("Region selector window not found")?;
+        // Creating the window on-demand might have a slight performance penalty, but when trying to
+        // reuse the same window there was odd behavior with the window flashing a menubar / visible resize.
+        let window = tauri::WebviewWindowBuilder::new(
+            &app,
+            "region-selector",
+            tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
+        )
+        .title("Region Selector")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .resizable(false)
+        .visible(false) // keep hidden until needed
+        .position(left, top)
+        .fullscreen(true)
+        .build();
 
-        window
-            .set_size(Size::Physical(PhysicalSize { width, height }))
-            .map_err(|e| e.to_string())?;
-        window
-            .set_position(Position::Physical(PhysicalPosition { x: left, y: top }))
-            .map_err(|e| e.to_string())?;
+        let window = window.map_err(|e| e.to_string())?;
+
         window.show().map_err(|e| e.to_string())?;
-        let _ = window.set_focus();
+        window.set_focus().map_err(|e| e.to_string())?;
         Ok(())
     } else {
         Err("Failed to retrieve monitor information".into())
@@ -129,7 +135,7 @@ async fn open_region_selector(app: tauri::AppHandle, monitor_handle: isize) -> R
 async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("region-selector") {
         window
-            .hide()
+            .destroy()
             .map_err(|e| format!("Failed to hide region selector: {}", e))?;
     }
     Ok(())
@@ -149,7 +155,7 @@ async fn region_selected(
     // Close the region selector window
     if let Some(window) = app.get_webview_window("region-selector") {
         window
-            .hide()
+            .destroy()
             .map_err(|e| format!("Failed to hide region selector: {}", e))?;
     }
 
@@ -186,22 +192,6 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             main_window.set_traffic_lights_inset(16.0, 20.0).unwrap();
 
-            // Pre-create the region selector window so it can be shown instantly later.
-            if app.get_webview_window("region-selector").is_none() {
-                let _ = tauri::WebviewWindowBuilder::new(
-                    app,
-                    "region-selector",
-                    tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
-                )
-                .title("Region Selector")
-                .fullscreen(true)
-                .decorations(false)
-                .transparent(true)
-                .always_on_top(true)
-                .resizable(false)
-                .visible(false) // keep hidden until needed
-                .build();
-            }
             Ok(())
         })
         .run(tauri::generate_context!())
