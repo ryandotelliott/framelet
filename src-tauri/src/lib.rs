@@ -3,6 +3,7 @@ mod screen_recorder;
 mod types;
 
 use std::{
+    os::raw::c_void,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -13,19 +14,14 @@ use tauri::{Emitter, Manager, State};
 
 use tauri_plugin_decorum::WebviewWindowExt;
 
-use crate::{capture_sources::CaptureSourceError, types::CaptureSourceType};
+use crate::{
+    capture_sources::CaptureSourceError,
+    types::{CaptureSourceType, RegionCoordinates},
+};
 use capture_sources::CaptureSourceManager;
 use types::CaptureSource;
 
 use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RegionCoordinates {
-    pub x: i32,
-    pub y: i32,
-    pub width: u32,
-    pub height: u32,
-}
 
 #[tauri::command]
 async fn get_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
@@ -93,30 +89,48 @@ async fn stop_recording(
 }
 
 #[tauri::command]
-async fn open_region_selector(app: tauri::AppHandle) -> Result<(), String> {
-    let _docs_window = tauri::WebviewWindowBuilder::new(
-        &app,
-        "region-selector",
-        tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
-    )
-    .title("Region Selector")
-    .fullscreen(true)
-    .decorations(false)
-    .transparent(true)
-    .always_on_top(true)
-    .resizable(false)
-    .build()
-    .map_err(|e| format!("Failed to create region selector window: {}", e))?;
+async fn open_region_selector(app: tauri::AppHandle, monitor_handle: isize) -> Result<(), String> {
+    use tauri::{PhysicalPosition, PhysicalSize, Position, Size};
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
 
-    Ok(())
+    // Retrieve rectangle directly from the HMONITOR
+    let hmonitor = HMONITOR(monitor_handle as *mut c_void);
+
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+
+    if unsafe { GetMonitorInfoW(hmonitor, &mut mi) }.as_bool() {
+        let left = mi.rcMonitor.left;
+        let top = mi.rcMonitor.top;
+        let width = (mi.rcMonitor.right - mi.rcMonitor.left) as u32;
+        let height = (mi.rcMonitor.bottom - mi.rcMonitor.top) as u32;
+
+        let window = app
+            .get_webview_window("region-selector")
+            .ok_or("Region selector window not found")?;
+
+        window
+            .set_size(Size::Physical(PhysicalSize { width, height }))
+            .map_err(|e| e.to_string())?;
+        window
+            .set_position(Position::Physical(PhysicalPosition { x: left, y: top }))
+            .map_err(|e| e.to_string())?;
+        window.show().map_err(|e| e.to_string())?;
+        let _ = window.set_focus();
+        Ok(())
+    } else {
+        Err("Failed to retrieve monitor information".into())
+    }
 }
 
 #[tauri::command]
 async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("region-selector") {
         window
-            .close()
-            .map_err(|e| format!("Failed to close region selector: {}", e))?;
+            .hide()
+            .map_err(|e| format!("Failed to hide region selector: {}", e))?;
     }
     Ok(())
 }
@@ -135,8 +149,8 @@ async fn region_selected(
     // Close the region selector window
     if let Some(window) = app.get_webview_window("region-selector") {
         window
-            .close()
-            .map_err(|e| format!("Failed to close region selector: {}", e))?;
+            .hide()
+            .map_err(|e| format!("Failed to hide region selector: {}", e))?;
     }
 
     Ok(())
@@ -171,6 +185,23 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             main_window.set_traffic_lights_inset(16.0, 20.0).unwrap();
+
+            // Pre-create the region selector window so it can be shown instantly later.
+            if app.get_webview_window("region-selector").is_none() {
+                let _ = tauri::WebviewWindowBuilder::new(
+                    app,
+                    "region-selector",
+                    tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
+                )
+                .title("Region Selector")
+                .fullscreen(true)
+                .decorations(false)
+                .transparent(true)
+                .always_on_top(true)
+                .resizable(false)
+                .visible(false) // keep hidden until needed
+                .build();
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

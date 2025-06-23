@@ -2,6 +2,7 @@ use crate::screen_recorder;
 use crate::types::{CaptureSource, CaptureSourceType, MonitorInfo, WindowInfo};
 use serde::Serialize;
 use thiserror::Error;
+use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
 use windows_capture::monitor::Monitor;
 use windows_capture::WindowsCaptureGraphicsCaptureItem;
 
@@ -31,28 +32,46 @@ impl CaptureSourceManager {
 
         let mut monitor_info = Vec::new();
         for (id, monitor) in monitors.iter().enumerate() {
-            let hmonitor = monitor.as_raw_hmonitor() as isize;
+            let mut mi = MONITORINFO {
+                cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+                ..Default::default()
+            };
+
+            let hmonitor = HMONITOR(monitor.as_raw_hmonitor());
+
+            let rect_ok = unsafe { GetMonitorInfoW(hmonitor, &mut mi) }.as_bool();
+
+            let (left, top, width, height) = if rect_ok {
+                let l = mi.rcMonitor.left;
+                let t = mi.rcMonitor.top;
+                let w = (mi.rcMonitor.right - mi.rcMonitor.left) as u32;
+                let h = (mi.rcMonitor.bottom - mi.rcMonitor.top) as u32;
+                (l, t, w, h)
+            } else {
+                let w = match monitor.width() {
+                    Ok(w) => w,
+                    _ => continue,
+                };
+                let h = match monitor.height() {
+                    Ok(h) => h,
+                    _ => continue,
+                };
+                (0, 0, w, h)
+            };
 
             let name = match monitor.name() {
                 Ok(n) if !n.trim().is_empty() => n,
                 _ => continue,
             };
 
-            let width = match monitor.width() {
-                Ok(w) => w,
-                _ => continue,
-            };
-            let height = match monitor.height() {
-                Ok(h) => h,
-                _ => continue,
-            };
-
             monitor_info.push(MonitorInfo {
                 id,
-                hmonitor,
+                hmonitor: hmonitor.0 as isize,
                 name,
                 width,
                 height,
+                left,
+                top,
             });
         }
 
@@ -114,6 +133,8 @@ impl CaptureSourceManager {
             height: monitor.height,
             source_type: CaptureSourceType::Monitor,
             handle: monitor.hmonitor,
+            left: monitor.left,
+            top: monitor.top,
         }));
 
         let windows = Self::get_windows()?;
@@ -125,6 +146,8 @@ impl CaptureSourceManager {
             height: window.height,
             source_type: CaptureSourceType::Window,
             handle: window.hwnd,
+            left: 0,
+            top: 0,
         }));
 
         println!("Total sources found: {}", sources.len());

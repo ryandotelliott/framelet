@@ -80,6 +80,7 @@ async function endSelection() {
     const regionData = { x: left, y: top, width, height };
     try {
       await invoke('region_selected', { coordinates: regionData });
+      await cancelSelection();
     } catch (error) {
       console.error('Error sending region coordinates:', error);
       await cancelSelection();

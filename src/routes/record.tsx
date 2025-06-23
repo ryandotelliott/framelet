@@ -95,7 +95,9 @@ export default function RecordPage() {
 
   async function openRegionSelector() {
     try {
-      await invoke('open_region_selector');
+      await invoke('open_region_selector', {
+        monitorHandle: selectedSource,
+      });
       setStatus('Region selector opened - click and drag to select an area');
     } catch (error) {
       setStatus(`Error opening region selector: ${error}`);
