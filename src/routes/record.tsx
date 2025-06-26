@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 interface CaptureSource {
   handle: number;
@@ -229,12 +230,12 @@ export default function RecordPage() {
             <CardContent className="flex flex-col gap-y-4">
               {/* Record Audio toggle */}
               <div className="flex items-center justify-between">
-                <Label>Record Audio</Label>
+                <Label htmlFor="recordAudio">Record Audio</Label>
                 <Switch checked={recordAudio} onCheckedChange={(v) => setRecordAudio(v)} />
               </div>
 
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="audioSource" className={!recordAudio ? labelDisabled : ''}>
+                <Label htmlFor="audioSource" className={cn({ [labelDisabled]: !recordAudio })}>
                   Audio Source
                 </Label>
                 <Select value={audioSource} onValueChange={setAudioSource} disabled={!recordAudio}>
@@ -255,12 +256,12 @@ export default function RecordPage() {
 
               {/* Microphone toggle */}
               <div className="flex items-center justify-between">
-                <Label>Microphone</Label>
+                <Label htmlFor="microphone">Microphone</Label>
                 <Switch checked={microphoneEnabled} onCheckedChange={(v) => setMicrophoneEnabled(v)} />
               </div>
 
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="inputSource" className={!microphoneEnabled ? labelDisabled : ''}>
+                <Label htmlFor="inputSource" className={cn({ [labelDisabled]: !microphoneEnabled })}>
                   Input Source
                 </Label>
                 <Select value={inputSource} onValueChange={setInputSource} disabled={!microphoneEnabled}>
@@ -291,7 +292,7 @@ export default function RecordPage() {
               </div>
 
               <div className="flex flex-col gap-y-2">
-                <Label htmlFor="webcamSource" className={!enableWebcam ? labelDisabled : ''}>
+                <Label htmlFor="webcamSource" className={cn({ [labelDisabled]: !enableWebcam })}>
                   Webcam Source
                 </Label>
                 <Select value={webcamSource} onValueChange={setWebcamSource} disabled={!enableWebcam}>
