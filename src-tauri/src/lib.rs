@@ -3,17 +3,21 @@ mod screen_recorder;
 mod types;
 
 use std::{
+    os::raw::c_void,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
     thread,
 };
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 use tauri_plugin_decorum::WebviewWindowExt;
 
-use crate::{capture_sources::CaptureSourceError, types::CaptureSourceType};
+use crate::{
+    capture_sources::CaptureSourceError,
+    types::{CaptureSourceType, RegionCoordinates},
+};
 use capture_sources::CaptureSourceManager;
 use types::CaptureSource;
 
@@ -84,6 +88,80 @@ async fn stop_recording(
     }
 }
 
+#[tauri::command]
+async fn open_region_selector(app: tauri::AppHandle, monitor_handle: isize) -> Result<(), String> {
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
+
+    // Retrieve rectangle directly from the HMONITOR
+    let hmonitor = HMONITOR(monitor_handle as *mut c_void);
+
+    let mut mi = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        ..Default::default()
+    };
+
+    if unsafe { GetMonitorInfoW(hmonitor, &mut mi) }.as_bool() {
+        let left = mi.rcMonitor.left as f64;
+        let top = mi.rcMonitor.top as f64;
+
+        // Creating the window on-demand might have a slight performance penalty, but when trying to
+        // reuse the same window there was odd behavior with the window flashing a menubar / visible resize.
+        let window = tauri::WebviewWindowBuilder::new(
+            &app,
+            "region-selector",
+            tauri::WebviewUrl::App("src/windows/region-selector/index.html".into()),
+        )
+        .title("Region Selector")
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .resizable(false)
+        .visible(false) // keep hidden until needed
+        .position(left, top)
+        .fullscreen(true)
+        .build();
+
+        let window = window.map_err(|e| e.to_string())?;
+
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        Ok(())
+    } else {
+        Err("Failed to retrieve monitor information".into())
+    }
+}
+
+#[tauri::command]
+async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("region-selector") {
+        window
+            .destroy()
+            .map_err(|e| format!("Failed to hide region selector: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn region_selected(
+    app: tauri::AppHandle,
+    coordinates: RegionCoordinates,
+) -> Result<(), String> {
+    println!("Region selected: {:?}", coordinates);
+
+    // Emit an event to the main window with the selected coordinates
+    app.emit("region-selected", &coordinates)
+        .map_err(|e| format!("Failed to emit region-selected event: {}", e))?;
+
+    // Close the region selector window
+    if let Some(window) = app.get_webview_window("region-selector") {
+        window
+            .destroy()
+            .map_err(|e| format!("Failed to hide region selector: {}", e))?;
+    }
+
+    Ok(())
+}
+
 struct RecordingSession {
     stop_signal: Arc<AtomicBool>,
     recording_thread: Option<thread::JoinHandle<()>>,
@@ -99,7 +177,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_capture_sources,
             start_recording,
-            stop_recording
+            stop_recording,
+            open_region_selector,
+            close_region_selector,
+            region_selected
         ])
         .setup(|app| {
             // Create a custom titlebar for main window using https://github.com/clearlysid/tauri-plugin-decorum/
@@ -110,6 +191,7 @@ pub fn run() {
 
             #[cfg(target_os = "macos")]
             main_window.set_traffic_lights_inset(16.0, 20.0).unwrap();
+
             Ok(())
         })
         .run(tauri::generate_context!())

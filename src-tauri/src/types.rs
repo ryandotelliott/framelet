@@ -7,6 +7,8 @@ pub struct MonitorInfo {
     pub name: String,
     pub width: u32,
     pub height: u32,
+    pub left: i32,
+    pub top: i32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,4 +34,14 @@ pub struct CaptureSource {
     pub height: u32,
     pub source_type: CaptureSourceType,
     pub handle: isize, // HWND or HMONITOR
+    pub left: i32,
+    pub top: i32,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RegionCoordinates {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
 }
