@@ -39,7 +39,7 @@ pub struct CaptureSource {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct RegionCoordinates {
+pub struct Region {
     pub x: i32,
     pub y: i32,
     pub width: u32,

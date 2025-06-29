@@ -16,7 +16,7 @@ use tauri_plugin_decorum::WebviewWindowExt;
 
 use crate::{
     capture_sources::CaptureSourceError,
-    types::{CaptureSourceType, RegionCoordinates},
+    types::{CaptureSourceType, Region},
 };
 use capture_sources::CaptureSourceManager;
 use types::CaptureSource;
@@ -142,10 +142,7 @@ async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn region_selected(
-    app: tauri::AppHandle,
-    coordinates: RegionCoordinates,
-) -> Result<(), String> {
+async fn region_selected(app: tauri::AppHandle, coordinates: Region) -> Result<(), String> {
     println!("Region selected: {:?}", coordinates);
 
     // Emit an event to the main window with the selected coordinates
