@@ -1,43 +1,24 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CropIcon, MonitorIcon, AppWindowMacIcon } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { cn } from '@/lib/utils';
-
-interface CaptureSource {
-  handle: number;
-  name: string;
-  width: number;
-  height: number;
-  source_type: string;
-}
-
-interface RegionCoordinates {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-// Utility for label disabled style
-const labelDisabled = 'opacity-50';
+import { SourceSettings } from '@/components/SourceSettings';
+import { OutputSettings } from '@/components/OutputSettings';
+import { AudioSettings } from '@/components/AudioSettings';
+import { WebcamSettings } from '@/components/WebcamSettings';
+import { CaptureSource, Region } from '@/types/recording';
 
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<number>(0);
-  const [outputPath, setOutputPath] = useState('recording.mp4');
+  const [fileName, setFileName] = useState('recording');
+  const [outputPath, setOutputPath] = useState('~/Desktop');
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState<RegionCoordinates | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
 
   /* ---------------------------------- Audio ---------------------------------- */
   const [recordAudio, setRecordAudio] = useState(false);
@@ -53,11 +34,13 @@ export default function RecordPage() {
   const [webcamSource, setWebcamSource] = useState('');
   const webcamSourcesList = ['Logitech 4K Webcam'];
 
+  const [monitorCaptureMode, setMonitorCaptureMode] = useState<'full' | 'custom'>('full');
+
   useEffect(() => {
     loadCaptureSources();
 
     // Listen for region selection events
-    const unlistenRegionSelected = listen<RegionCoordinates>('region-selected', (event) => {
+    const unlistenRegionSelected = listen<Region>('region-selected', (event) => {
       console.log('Region selected:', event.payload);
       setSelectedRegion(event.payload);
       setStatus(
@@ -97,7 +80,7 @@ export default function RecordPage() {
       const result = await invoke<string>('start_recording', {
         handle: source.handle,
         sourceType: source.source_type,
-        outputPath,
+        outputPath: `${outputPath}/${fileName}.mp4`,
       });
       setStatus(result);
       setIsRecording(true);
@@ -128,13 +111,6 @@ export default function RecordPage() {
     }
   }
 
-  const selectedSourceInfo = captureSources.find((source) => source.handle === selectedSource);
-
-  const monitorSources = captureSources.filter((source) => source.source_type === 'monitor');
-  const windowSources = captureSources.filter((source) => source.source_type === 'window');
-
-  const [monitorCaptureMode, setMonitorCaptureMode] = useState<'full' | 'custom'>('full');
-
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-y-4 px-6 pt-10 pb-6">
       <div className="grid w-full max-w-[850px] grid-cols-3 gap-x-3">
@@ -143,173 +119,55 @@ export default function RecordPage() {
             <CardTitle>Source Settings</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-y-4">
-            <Tabs defaultValue="monitor" className="w-full gap-y-4">
-              <TabsList className="w-full">
-                <TabsTrigger value="monitor">
-                  <MonitorIcon /> Monitor
-                </TabsTrigger>
-                <TabsTrigger value="window">
-                  <AppWindowMacIcon /> Window
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="monitor" className="flex flex-col gap-y-4">
-                <Select onValueChange={(value) => setSelectedSource(Number(value))}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a monitor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monitorSources.map((source) => (
-                      <SelectItem key={source.handle} value={source.handle.toString()}>
-                        {source.name} ({source.width}x{source.height})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex gap-x-2">
-                  {/* Note that both buttons should have a button in order to keep the width the same*/}
-                  <Button
-                    variant={monitorCaptureMode === 'full' ? 'default' : 'outline'}
-                    className="grow border"
-                    onClick={() => setMonitorCaptureMode('full')}
-                  >
-                    <MonitorIcon /> Full Monitor
-                  </Button>
-                  <Button
-                    variant={monitorCaptureMode === 'custom' ? 'default' : 'outline'}
-                    className="grow border"
-                    onClick={() => setMonitorCaptureMode('custom')}
-                  >
-                    <CropIcon /> Custom Region
-                  </Button>
-                </div>
-              </TabsContent>
-              <TabsContent value="window">
-                <Select onValueChange={(value) => setSelectedSource(Number(value))}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a window" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {windowSources.map((source) => (
-                      <SelectItem key={source.handle} value={source.handle.toString()}>
-                        {source.name} ({source.width}x{source.height})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </TabsContent>
-            </Tabs>
+            <SourceSettings
+              captureSources={captureSources}
+              selectedSource={selectedSource}
+              onSourceChange={setSelectedSource}
+              monitorCaptureMode={monitorCaptureMode}
+              onMonitorCaptureModeChange={setMonitorCaptureMode}
+            />
           </CardContent>
 
           <CardContent className="flex flex-col gap-y-4">
             <Separator />
             <CardTitle>Output Settings</CardTitle>
-            <div className="flex flex-col gap-y-2">
-              <Label htmlFor="fileName">File Name</Label>
-              <Input id="fileName" placeholder="recording" />
-            </div>
-            <div className="flex flex-col gap-y-2">
-              <Label htmlFor="outputPath">Output Path</Label>
-              <div className="flex gap-x-2">
-                <Input id="outputPath" placeholder="~/Desktop" />
-                <Button variant="outline">Browse</Button>
-              </div>
-            </div>
+            <OutputSettings
+              fileName={fileName}
+              onFileNameChange={setFileName}
+              outputPath={outputPath}
+              onOutputPathChange={setOutputPath}
+            />
           </CardContent>
 
           <CardContent className="flex flex-col gap-y-4">
             <Separator />
-            <Button>Start Recording</Button>
+            <Button onClick={isRecording ? stopRecording : startRecording}>
+              {isRecording ? 'Stop Recording' : 'Start Recording'}
+            </Button>
           </CardContent>
         </Card>
+
         <div className="col-span-1 flex w-full flex-col gap-y-4">
-          {/* ----------------------------- Audio Settings ----------------------------- */}
-          <Card className="col-span-1 flex w-full gap-y-4">
-            <CardHeader>
-              <CardTitle>Audio Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-y-4">
-              {/* Record Audio toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="recordAudio">Record Audio</Label>
-                <Switch checked={recordAudio} onCheckedChange={(v) => setRecordAudio(v)} />
-              </div>
+          <AudioSettings
+            recordAudio={recordAudio}
+            onRecordAudioChange={setRecordAudio}
+            audioSource={audioSource}
+            onAudioSourceChange={setAudioSource}
+            microphoneEnabled={microphoneEnabled}
+            onMicrophoneEnabledChange={setMicrophoneEnabled}
+            inputSource={inputSource}
+            onInputSourceChange={setInputSource}
+            audioSourcesList={audioSourcesList}
+            microphoneSourcesList={microphoneSourcesList}
+          />
 
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="audioSource" className={cn({ [labelDisabled]: !recordAudio })}>
-                  Audio Source
-                </Label>
-                <Select value={audioSource} onValueChange={setAudioSource} disabled={!recordAudio}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select audio source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {audioSourcesList.map((src) => (
-                      <SelectItem key={src} value={src}>
-                        {src}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Separator />
-
-              {/* Microphone toggle */}
-              <div className="flex items-center justify-between">
-                <Label htmlFor="microphone">Microphone</Label>
-                <Switch checked={microphoneEnabled} onCheckedChange={(v) => setMicrophoneEnabled(v)} />
-              </div>
-
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="inputSource" className={cn({ [labelDisabled]: !microphoneEnabled })}>
-                  Input Source
-                </Label>
-                <Select value={inputSource} onValueChange={setInputSource} disabled={!microphoneEnabled}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select input source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {microphoneSourcesList.map((src) => (
-                      <SelectItem key={src} value={src}>
-                        {src}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ---------------------------- Webcam Settings ---------------------------- */}
-          <Card className="col-span-1 flex w-full gap-y-4">
-            <CardHeader>
-              <CardTitle>Webcam Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-y-4">
-              <div className="flex items-center justify-between">
-                <Label>Enable Webcam</Label>
-                <Switch checked={enableWebcam} onCheckedChange={(v) => setEnableWebcam(v)} />
-              </div>
-
-              <div className="flex flex-col gap-y-2">
-                <Label htmlFor="webcamSource" className={cn({ [labelDisabled]: !enableWebcam })}>
-                  Webcam Source
-                </Label>
-                <Select value={webcamSource} onValueChange={setWebcamSource} disabled={!enableWebcam}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select webcam source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {webcamSourcesList.map((src) => (
-                      <SelectItem key={src} value={src}>
-                        {src}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <WebcamSettings
+            enableWebcam={enableWebcam}
+            onEnableWebcamChange={setEnableWebcam}
+            webcamSource={webcamSource}
+            onWebcamSourceChange={setWebcamSource}
+            webcamSourcesList={webcamSourcesList}
+          />
         </div>
       </div>
     </div>
