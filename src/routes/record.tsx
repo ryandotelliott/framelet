@@ -81,6 +81,7 @@ export default function RecordPage() {
         handle: source.handle,
         sourceType: source.source_type,
         outputPath: `${outputPath}/${fileName}.mp4`,
+        region: monitorCaptureMode === 'custom' ? selectedRegion : null,
       });
       setStatus(result);
       setIsRecording(true);
@@ -125,6 +126,7 @@ export default function RecordPage() {
               onSourceChange={setSelectedSource}
               monitorCaptureMode={monitorCaptureMode}
               onMonitorCaptureModeChange={setMonitorCaptureMode}
+              onOpenRegionSelector={openRegionSelector}
             />
           </CardContent>
 

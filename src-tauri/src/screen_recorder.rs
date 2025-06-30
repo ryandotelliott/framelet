@@ -17,6 +17,8 @@ use windows_capture::{
     WindowsCaptureGraphicsCaptureItem,
 };
 
+use crate::types::Region;
+
 // TODO: Audio capture - use wasapi-rs with `send_frame_with_audio` or `send_audio_buffer` in windows-capture
 
 #[derive(Debug, Clone)]
@@ -25,6 +27,7 @@ pub struct RecordingConfig {
     pub height: u32,
     pub output_path: String,
     pub stop_signal: Arc<AtomicBool>,
+    pub region: Option<Region>,
 }
 
 // Handles capture events.
@@ -32,6 +35,7 @@ pub struct ScreenRecorder {
     encoder: Option<VideoEncoder>,
     start: Instant,
     stop_signal: Arc<AtomicBool>,
+    region: Option<Region>,
 }
 
 impl GraphicsCaptureApiHandler for ScreenRecorder {
@@ -53,6 +57,7 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
             encoder: Some(encoder),
             start: Instant::now(),
             stop_signal: ctx.flags.stop_signal,
+            region: ctx.flags.region,
         })
     }
 
@@ -75,7 +80,13 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
         );
         io::stdout().flush()?;
 
-        // TODO: Apply any cropping here - potentially using WGPU?
+        if let Some(region) = &self.region {
+            // TODO: Crop the frame to the selected region. The windows-capture crate doesn't
+            // currently expose an easy way to crop. This is a placeholder for future
+            // implementation (e.g., using wgpu or custom pixel manipulation).
+            // For now we ignore the region and capture the full frame.
+            let _ = region; // Suppress unused warning
+        }
 
         // Send the frame to the video encoder
         self.encoder.as_mut().unwrap().send_frame(frame)?;
@@ -116,6 +127,7 @@ pub fn start_recording(
     capture_item: WindowsCaptureGraphicsCaptureItem,
     output_path: String,
     stop_signal: Arc<AtomicBool>,
+    region: Option<Region>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let width = capture_item.Size()?.Width as u32;
     let height = capture_item.Size()?.Height as u32;
@@ -125,6 +137,7 @@ pub fn start_recording(
         height,
         output_path,
         stop_signal,
+        region,
     };
 
     let settings = Settings::new(

@@ -10,14 +10,15 @@ interface SourceSettingsProps {
   onSourceChange: (source: number) => void;
   monitorCaptureMode: 'full' | 'custom';
   onMonitorCaptureModeChange: (mode: 'full' | 'custom') => void;
+  onOpenRegionSelector?: () => void;
 }
 
 export function SourceSettings({
   captureSources,
-  selectedSource,
   onSourceChange,
   monitorCaptureMode,
   onMonitorCaptureModeChange,
+  onOpenRegionSelector,
 }: SourceSettingsProps) {
   const monitorSources = captureSources.filter((source) => source.source_type === 'monitor');
   const windowSources = captureSources.filter((source) => source.source_type === 'window');
@@ -56,7 +57,10 @@ export function SourceSettings({
           <Button
             variant={monitorCaptureMode === 'custom' ? 'default' : 'outline'}
             className="grow border"
-            onClick={() => onMonitorCaptureModeChange('custom')}
+            onClick={() => {
+              onMonitorCaptureModeChange('custom');
+              onOpenRegionSelector?.();
+            }}
           >
             <CropIcon /> Custom Region
           </Button>

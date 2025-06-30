@@ -34,6 +34,7 @@ async fn start_recording(
     handle: isize,
     source_type: CaptureSourceType,
     output_path: String,
+    region: Option<Region>,
 ) -> Result<String, String> {
     // Used to prevent concurrent recordings
     let mut session_guard = state.lock().unwrap();
@@ -56,13 +57,15 @@ async fn start_recording(
 
     let stop_signal = Arc::new(AtomicBool::new(false));
     let thread_handle = thread::spawn({
-        let stop_signal = stop_signal.clone();
+        let stop_signal = Arc::clone(&stop_signal);
         move || {
-            if let Err(e) = screen_recorder::start_recording(item, output_path, stop_signal) {
+            if let Err(e) = screen_recorder::start_recording(item, output_path, stop_signal, region)
+            {
                 eprintln!("Recording error: {}", e);
             }
         }
     });
+
     *session_guard = Some(RecordingSession {
         stop_signal,
         recording_thread: Some(thread_handle),
