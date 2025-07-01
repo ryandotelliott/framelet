@@ -15,9 +15,9 @@ export default function RecordPage() {
   const [selectedSource, setSelectedSource] = useState<number>(0);
   const [outputPath, setOutputPath] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [status, setStatus] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [isRegionSelectorOpen, setIsRegionSelectorOpen] = useState(false);
 
   /* ---------------------------------- Audio ---------------------------------- */
   const [recordAudio, setRecordAudio] = useState(false);
@@ -42,15 +42,24 @@ export default function RecordPage() {
     const unlistenRegionSelected = listen<Region>('region-selected', (event) => {
       console.log('Region selected:', event.payload);
       setSelectedRegion(event.payload);
-      setStatus(
-        `Region selected: ${event.payload.width}x${event.payload.height} at (${event.payload.x}, ${event.payload.y})`,
-      );
+      setIsRegionSelectorOpen(false);
+    });
+
+    // Listen for region selector cancellation
+    const unlistenRegionCancelled = listen('region-selector-closed', () => {
+      console.log('Region selector closed without selection');
+      setIsRegionSelectorOpen(false);
+      // Reset to full monitor mode if we were in custom mode and the selector was open
+      if (monitorCaptureMode === 'custom' && isRegionSelectorOpen) {
+        setMonitorCaptureMode('full');
+      }
     });
 
     return () => {
       unlistenRegionSelected.then((unlisten) => unlisten());
+      unlistenRegionCancelled.then((unlisten) => unlisten());
     };
-  }, []);
+  }, [monitorCaptureMode, isRegionSelectorOpen]);
 
   async function loadCaptureSources() {
     setIsLoadingSources(true);
@@ -60,9 +69,8 @@ export default function RecordPage() {
       if (sources.length > 0) {
         setSelectedSource(sources[0].handle);
       }
-      setStatus('');
     } catch (error) {
-      setStatus(`Error loading capture sources: ${error}`);
+      console.error('Error loading capture sources:', error);
     } finally {
       setIsLoadingSources(false);
     }
@@ -71,46 +79,59 @@ export default function RecordPage() {
   async function startRecording() {
     const source = captureSources.find((s) => s.handle === selectedSource);
     if (!source) {
-      setStatus('Error: no capture source selected');
+      console.error('Error: no capture source selected');
       return;
     }
 
     try {
-      setStatus('Starting recording...');
       const result = await invoke<string>('start_recording', {
         handle: source.handle,
         sourceType: source.source_type,
         outputPath: outputPath,
         region: monitorCaptureMode === 'custom' ? selectedRegion : null,
       });
-      setStatus(result);
+      console.log('Recording started:', result);
       setIsRecording(true);
     } catch (error) {
-      setStatus(`Error starting recording: ${error}`);
+      console.error('Error starting recording:', error);
     }
   }
 
   async function stopRecording() {
     try {
-      setStatus('Stopping recording...');
-      const result = await invoke<string>('stop_recording');
-      setStatus(result);
+      await invoke<string>('stop_recording');
       setIsRecording(false);
     } catch (error) {
-      setStatus(`Error stopping recording: ${error}`);
+      console.error('Error stopping recording:', error);
     }
   }
 
   async function openRegionSelector() {
     try {
+      setIsRegionSelectorOpen(true);
       await invoke('open_region_selector', {
         monitorHandle: selectedSource,
       });
-      setStatus('Region selector opened - click and drag to select an area');
     } catch (error) {
-      setStatus(`Error opening region selector: ${error}`);
+      setIsRegionSelectorOpen(false);
+      console.error('Error opening region selector:', error);
     }
   }
+
+  const handleMonitorCaptureModeChange = (mode: 'full' | 'custom') => {
+    setMonitorCaptureMode(mode);
+    if (mode === 'full') {
+      setSelectedRegion(null);
+    }
+  };
+
+  const handleSourceChange = (source: number) => {
+    setSelectedSource(source);
+
+    if (monitorCaptureMode === 'custom') {
+      setSelectedRegion(null);
+    }
+  };
 
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-y-4 px-6 pt-10 pb-6">
@@ -123,9 +144,10 @@ export default function RecordPage() {
             <SourceSettings
               captureSources={captureSources}
               selectedSource={selectedSource}
-              onSourceChange={setSelectedSource}
+              onSourceChange={handleSourceChange}
               monitorCaptureMode={monitorCaptureMode}
-              onMonitorCaptureModeChange={setMonitorCaptureMode}
+              onMonitorCaptureModeChange={handleMonitorCaptureModeChange}
+              selectedRegion={selectedRegion}
               onOpenRegionSelector={openRegionSelector}
             />
           </CardContent>

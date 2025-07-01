@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { CropIcon, MonitorIcon, AppWindowMacIcon } from 'lucide-react';
-import { CaptureSource } from '@/types/recording';
+import { CaptureSource, Region } from '@/types/recording';
 import { useEffect, useState } from 'react';
 
 interface SourceSettingsProps {
@@ -11,6 +11,7 @@ interface SourceSettingsProps {
   onSourceChange: (source: number) => void;
   monitorCaptureMode: 'full' | 'custom';
   onMonitorCaptureModeChange: (mode: 'full' | 'custom') => void;
+  selectedRegion: Region | null;
   onOpenRegionSelector?: () => void;
 }
 
@@ -22,6 +23,7 @@ export function SourceSettings({
   onSourceChange,
   monitorCaptureMode,
   onMonitorCaptureModeChange,
+  selectedRegion,
   onOpenRegionSelector,
 }: SourceSettingsProps) {
   const monitorSources = captureSources.filter((source) => source.source_type === 'monitor');
@@ -103,6 +105,11 @@ export function SourceSettings({
             <CropIcon /> Custom Region
           </Button>
         </div>
+        {monitorCaptureMode === 'custom' && selectedRegion && (
+          <div className="text-muted-foreground text-sm">
+            Selected Region: {selectedRegion.width} &#x00d7; {selectedRegion.height}
+          </div>
+        )}
       </TabsContent>
       <TabsContent value="window">
         <Select

@@ -53,6 +53,9 @@ pub async fn close_region_selector(app: tauri::AppHandle) -> Result<(), String> 
         window
             .destroy()
             .map_err(|e| format!("Failed to hide region selector: {}", e))?;
+
+        app.emit("region-selector-closed", ())
+            .map_err(|e| format!("Failed to emit region-selector-closed event: {}", e))?;
     }
     Ok(())
 }
