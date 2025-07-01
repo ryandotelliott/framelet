@@ -1,5 +1,4 @@
 use std::{
-    io::{self, Write},
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -109,8 +108,8 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
                     );
                 }
 
-                // The buffer might be upside down due to coordinate system differences
-                // Let's try flipping it vertically
+                // The buffer comes in upside down, I believe this is a side effect of the cropping
+                // but I'm not sure - just flip it for now.
                 let mut flipped_buffer = Vec::with_capacity(raw_cropped_buffer.len());
                 let width = region.width as usize;
                 let height = region.height as usize;
