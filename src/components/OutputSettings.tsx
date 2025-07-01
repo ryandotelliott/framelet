@@ -1,36 +1,42 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { save } from '@tauri-apps/plugin-dialog';
+import { videoDir } from '@tauri-apps/api/path';
 
 interface OutputSettingsProps {
-  fileName: string;
-  onFileNameChange: (fileName: string) => void;
   outputPath: string;
   onOutputPathChange: (outputPath: string) => void;
 }
 
-export function OutputSettings({ fileName, onFileNameChange, outputPath, onOutputPathChange }: OutputSettingsProps) {
+export function OutputSettings({ outputPath, onOutputPathChange }: OutputSettingsProps) {
+  const handleBrowser = async () => {
+    const path = await save({
+      title: 'Select Output Path',
+      defaultPath: await videoDir(),
+      filters: [{ name: 'MP4', extensions: ['mp4'] }],
+    });
+
+    if (path) {
+      onOutputPathChange(path);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-y-4">
-      <div className="flex flex-col gap-y-2">
-        <Label htmlFor="fileName">File Name</Label>
-        <Input
-          id="fileName"
-          placeholder="recording"
-          value={fileName}
-          onChange={(e) => onFileNameChange(e.target.value)}
-        />
-      </div>
       <div className="flex flex-col gap-y-2">
         <Label htmlFor="outputPath">Output Path</Label>
         <div className="flex gap-x-2">
           <Input
             id="outputPath"
-            placeholder="~/Desktop"
+            placeholder="/videos/recording.mp4"
             value={outputPath}
             onChange={(e) => onOutputPathChange(e.target.value)}
+            onClick={handleBrowser}
           />
-          <Button variant="outline">Browse</Button>
+          <Button variant="outline" onClick={handleBrowser}>
+            Browse
+          </Button>
         </div>
       </div>
     </div>

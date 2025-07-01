@@ -46,8 +46,17 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
         println!("Using dimensions: {}x{}", ctx.flags.width, ctx.flags.height);
         println!("Output file: {}", ctx.flags.output_path);
 
+        // Use cropped dimensions if region is specified
+        let (encoder_width, encoder_height) = if let Some(region) = &ctx.flags.region {
+            (region.width, region.height)
+        } else {
+            (ctx.flags.width, ctx.flags.height)
+        };
+
+        println!("Encoder dimensions: {}x{}", encoder_width, encoder_height);
+
         let encoder = VideoEncoder::new(
-            VideoSettingsBuilder::new(ctx.flags.width, ctx.flags.height),
+            VideoSettingsBuilder::new(encoder_width, encoder_height),
             AudioSettingsBuilder::default().disabled(true),
             ContainerSettingsBuilder::default(),
             &ctx.flags.output_path,
@@ -74,22 +83,62 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
             return Ok(());
         }
 
-        print!(
-            "\rRecording for: {} seconds",
-            self.start.elapsed().as_secs()
-        );
-        io::stdout().flush()?;
+        match &self.region {
+            Some(region) => {
+                // The region coordinates are in screen space, but we need to adjust them
+                // relative to the captured frame. For now, let's assume they're already correct
+                // but add some debugging to verify
+                let start_x = region.x as u32;
+                let start_y = region.y as u32;
+                let end_x = (region.x as u32) + region.width;
+                let end_y = (region.y as u32) + region.height;
 
-        if let Some(region) = &self.region {
-            // TODO: Crop the frame to the selected region. The windows-capture crate doesn't
-            // currently expose an easy way to crop. This is a placeholder for future
-            // implementation (e.g., using wgpu or custom pixel manipulation).
-            // For now we ignore the region and capture the full frame.
-            let _ = region; // Suppress unused warning
+                let duration = frame.timespan().Duration;
+                let mut cropped_frame = frame
+                    .buffer_crop(start_x, start_y, end_x, end_y)
+                    .expect("Failed to crop buffer");
+
+                let raw_cropped_buffer = cropped_frame.as_nopadding_buffer()?;
+
+                let expected_size = region.width as usize * region.height as usize * 4;
+                if raw_cropped_buffer.len() != expected_size {
+                    println!(
+                        "WARNING: Buffer size mismatch! Expected: {}, Got: {}",
+                        expected_size,
+                        raw_cropped_buffer.len()
+                    );
+                }
+
+                // The buffer might be upside down due to coordinate system differences
+                // Let's try flipping it vertically
+                let mut flipped_buffer = Vec::with_capacity(raw_cropped_buffer.len());
+                let width = region.width as usize;
+                let height = region.height as usize;
+                let bytes_per_row = width * 4; // RGBA = 4 bytes per pixel
+
+                for row in (0..height).rev() {
+                    let start_idx = row * bytes_per_row;
+                    let end_idx = start_idx + bytes_per_row;
+                    flipped_buffer.extend_from_slice(&raw_cropped_buffer[start_idx..end_idx]);
+                }
+
+                match self
+                    .encoder
+                    .as_mut()
+                    .unwrap()
+                    .send_frame_buffer(&flipped_buffer, duration)
+                {
+                    Ok(_) => (),
+                    Err(e) => {
+                        println!("ERROR sending frame: {}", e);
+                        return Err(Box::new(e));
+                    }
+                }
+            }
+            None => {
+                self.encoder.as_mut().unwrap().send_frame(frame)?;
+            }
         }
-
-        // Send the frame to the video encoder
-        self.encoder.as_mut().unwrap().send_frame(frame)?;
 
         Ok(())
     }
@@ -143,7 +192,7 @@ pub fn start_recording(
     let settings = Settings::new(
         capture_item,
         CursorCaptureSettings::Default,
-        DrawBorderSettings::Default,
+        DrawBorderSettings::WithoutBorder,
         ColorFormat::Rgba8,
         config,
     );

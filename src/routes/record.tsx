@@ -13,8 +13,7 @@ import { CaptureSource, Region } from '@/types/recording';
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<number>(0);
-  const [fileName, setFileName] = useState('recording');
-  const [outputPath, setOutputPath] = useState('~/Desktop');
+  const [outputPath, setOutputPath] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('');
   const [isLoadingSources, setIsLoadingSources] = useState(false);
@@ -75,12 +74,13 @@ export default function RecordPage() {
       setStatus('Error: no capture source selected');
       return;
     }
+
     try {
       setStatus('Starting recording...');
       const result = await invoke<string>('start_recording', {
         handle: source.handle,
         sourceType: source.source_type,
-        outputPath: `${outputPath}/${fileName}.mp4`,
+        outputPath: outputPath,
         region: monitorCaptureMode === 'custom' ? selectedRegion : null,
       });
       setStatus(result);
@@ -133,15 +133,10 @@ export default function RecordPage() {
           <CardContent className="flex flex-col gap-y-4">
             <Separator />
             <CardTitle>Output Settings</CardTitle>
-            <OutputSettings
-              fileName={fileName}
-              onFileNameChange={setFileName}
-              outputPath={outputPath}
-              onOutputPathChange={setOutputPath}
-            />
+            <OutputSettings outputPath={outputPath} onOutputPathChange={setOutputPath} />
           </CardContent>
 
-          <CardContent className="flex flex-col gap-y-4">
+          <CardContent className="mt-auto flex flex-col gap-y-4">
             <Separator />
             <Button onClick={isRecording ? stopRecording : startRecording}>
               {isRecording ? 'Stop Recording' : 'Start Recording'}
