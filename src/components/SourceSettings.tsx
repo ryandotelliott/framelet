@@ -1,7 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { CropIcon, MonitorIcon, AppWindowMacIcon } from 'lucide-react';
+import { CropIcon, MonitorIcon, AppWindowMacIcon, RefreshCw } from 'lucide-react';
 import { CaptureSource, Region } from '@/types/recording';
 import { useEffect, useState } from 'react';
 
@@ -13,6 +13,8 @@ interface SourceSettingsProps {
   onMonitorCaptureModeChange: (mode: 'full' | 'custom') => void;
   selectedRegion: Region | null;
   onOpenRegionSelector?: () => void;
+  onTabChange?: (newTab: string) => void;
+  onRefresh?: () => void;
 }
 
 type SourceTab = 'monitor' | 'window';
@@ -25,6 +27,8 @@ export function SourceSettings({
   onMonitorCaptureModeChange,
   selectedRegion,
   onOpenRegionSelector,
+  onTabChange,
+  onRefresh,
 }: SourceSettingsProps) {
   const monitorSources = captureSources.filter((source) => source.source_type === 'monitor');
   const windowSources = captureSources.filter((source) => source.source_type === 'window');
@@ -51,6 +55,8 @@ export function SourceSettings({
     if (newSources.length > 0) {
       onSourceChange(newSources[0].handle);
     }
+
+    onTabChange?.(value);
   };
 
   const currentSources = selectedTab === 'monitor' ? monitorSources : windowSources;
@@ -68,22 +74,27 @@ export function SourceSettings({
         </TabsTrigger>
       </TabsList>
       <TabsContent value="monitor" className="flex flex-col gap-y-4">
-        <Select
-          onValueChange={(value) => onSourceChange(Number(value))}
-          value={hasSources ? selectedSource.toString() : undefined}
-          disabled={!hasSources}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={hasSources ? 'Select a monitor' : emptyMessage} />
-          </SelectTrigger>
-          <SelectContent>
-            {monitorSources.map((source) => (
-              <SelectItem key={source.handle} value={source.handle.toString()}>
-                {source.name} ({source.width}x{source.height})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center justify-between gap-x-2">
+          <Select
+            onValueChange={(value) => onSourceChange(Number(value))}
+            value={hasSources ? selectedSource.toString() : undefined}
+            disabled={!hasSources}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={hasSources ? 'Select a monitor' : emptyMessage} />
+            </SelectTrigger>
+            <SelectContent>
+              {monitorSources.map((source) => (
+                <SelectItem key={source.handle} value={source.handle.toString()}>
+                  {source.name} ({source.width}x{source.height})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" onClick={onRefresh}>
+            <RefreshCw />
+          </Button>
+        </div>
         <div className="flex gap-x-2">
           <Button
             variant={monitorCaptureMode === 'full' ? 'default' : 'outline'}
@@ -112,22 +123,27 @@ export function SourceSettings({
         )}
       </TabsContent>
       <TabsContent value="window">
-        <Select
-          onValueChange={(value) => onSourceChange(Number(value))}
-          value={hasSources ? selectedSource.toString() : undefined}
-          disabled={!hasSources}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={hasSources ? 'Select a window' : emptyMessage} />
-          </SelectTrigger>
-          <SelectContent>
-            {windowSources.map((source) => (
-              <SelectItem key={source.handle} value={source.handle.toString()}>
-                {source.name} ({source.width}x{source.height})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center justify-between gap-x-2">
+          <Select
+            onValueChange={(value) => onSourceChange(Number(value))}
+            value={hasSources ? selectedSource.toString() : undefined}
+            disabled={!hasSources}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={hasSources ? 'Select a window' : emptyMessage} />
+            </SelectTrigger>
+            <SelectContent>
+              {windowSources.map((source) => (
+                <SelectItem key={source.handle} value={source.handle.toString()}>
+                  {source.name} ({source.width}x{source.height})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" onClick={onRefresh}>
+            <RefreshCw />
+          </Button>
+        </div>
       </TabsContent>
     </Tabs>
   );

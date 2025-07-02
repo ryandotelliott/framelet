@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,31 +9,43 @@ import { OutputSettings } from '@/components/OutputSettings';
 import { AudioSettings } from '@/components/AudioSettings';
 import { WebcamSettings } from '@/components/WebcamSettings';
 import { CaptureSource, Region } from '@/types/recording';
+import { RefreshCw } from 'lucide-react';
 
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
   const [selectedSource, setSelectedSource] = useState<number>(0);
   const [outputPath, setOutputPath] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
   const [isRegionSelectorOpen, setIsRegionSelectorOpen] = useState(false);
 
   /* ---------------------------------- Audio ---------------------------------- */
   const [recordAudio, setRecordAudio] = useState(false);
   const [audioSource, setAudioSource] = useState('');
-  const audioSourcesList = ['All System Audio'];
+  const audioSourcesList = useMemo(() => ['All System Audio'], []);
 
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [inputSource, setInputSource] = useState('');
-  const microphoneSourcesList = ['Default - Microphone'];
+  const microphoneSourcesList = useMemo(() => ['Default - Microphone'], []);
 
   /* --------------------------------- Webcam ---------------------------------- */
   const [enableWebcam, setEnableWebcam] = useState(false);
   const [webcamSource, setWebcamSource] = useState('');
-  const webcamSourcesList = ['Logitech 4K Webcam'];
+  const webcamSourcesList = useMemo(() => ['Logitech 4K Webcam'], []);
 
   const [monitorCaptureMode, setMonitorCaptureMode] = useState<'full' | 'custom'>('full');
+
+  const loadCaptureSources = useCallback(async () => {
+    try {
+      const sources = await invoke<CaptureSource[]>('get_capture_sources');
+      setCaptureSources(sources);
+      if (sources.length > 0) {
+        setSelectedSource(sources[0].handle);
+      }
+    } catch (error) {
+      console.error('Error loading capture sources:', error);
+    }
+  }, []);
 
   useEffect(() => {
     loadCaptureSources();
@@ -59,24 +71,9 @@ export default function RecordPage() {
       unlistenRegionSelected.then((unlisten) => unlisten());
       unlistenRegionCancelled.then((unlisten) => unlisten());
     };
-  }, [monitorCaptureMode, isRegionSelectorOpen]);
+  }, [monitorCaptureMode, isRegionSelectorOpen, loadCaptureSources]);
 
-  async function loadCaptureSources() {
-    setIsLoadingSources(true);
-    try {
-      const sources = await invoke<CaptureSource[]>('get_capture_sources');
-      setCaptureSources(sources);
-      if (sources.length > 0) {
-        setSelectedSource(sources[0].handle);
-      }
-    } catch (error) {
-      console.error('Error loading capture sources:', error);
-    } finally {
-      setIsLoadingSources(false);
-    }
-  }
-
-  async function startRecording() {
+  const startRecording = useCallback(async () => {
     const source = captureSources.find((s) => s.handle === selectedSource);
     if (!source) {
       console.error('Error: no capture source selected');
@@ -95,18 +92,18 @@ export default function RecordPage() {
     } catch (error) {
       console.error('Error starting recording:', error);
     }
-  }
+  }, [captureSources, selectedSource, outputPath, monitorCaptureMode, selectedRegion]);
 
-  async function stopRecording() {
+  const stopRecording = useCallback(async () => {
     try {
       await invoke<string>('stop_recording');
       setIsRecording(false);
     } catch (error) {
       console.error('Error stopping recording:', error);
     }
-  }
+  }, []);
 
-  async function openRegionSelector() {
+  const openRegionSelector = useCallback(async () => {
     try {
       setIsRegionSelectorOpen(true);
       await invoke('open_region_selector', {
@@ -116,22 +113,29 @@ export default function RecordPage() {
       setIsRegionSelectorOpen(false);
       console.error('Error opening region selector:', error);
     }
-  }
+  }, [selectedSource]);
 
-  const handleMonitorCaptureModeChange = (mode: 'full' | 'custom') => {
+  const handleMonitorCaptureModeChange = useCallback((mode: 'full' | 'custom') => {
     setMonitorCaptureMode(mode);
     if (mode === 'full') {
       setSelectedRegion(null);
     }
-  };
+  }, []);
 
-  const handleSourceChange = (source: number) => {
-    setSelectedSource(source);
+  const handleSourceChange = useCallback(
+    (source: number) => {
+      setSelectedSource(source);
 
-    if (monitorCaptureMode === 'custom') {
-      setSelectedRegion(null);
-    }
-  };
+      if (monitorCaptureMode === 'custom') {
+        setSelectedRegion(null);
+      }
+    },
+    [monitorCaptureMode],
+  );
+
+  const handleTabChange = useCallback(() => {
+    loadCaptureSources();
+  }, [loadCaptureSources]);
 
   return (
     <div className="flex h-screen flex-col items-center justify-center gap-y-4 px-6 pt-10 pb-6">
@@ -141,15 +145,19 @@ export default function RecordPage() {
             <CardTitle>Source Settings</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-y-4">
-            <SourceSettings
-              captureSources={captureSources}
-              selectedSource={selectedSource}
-              onSourceChange={handleSourceChange}
-              monitorCaptureMode={monitorCaptureMode}
-              onMonitorCaptureModeChange={handleMonitorCaptureModeChange}
-              selectedRegion={selectedRegion}
-              onOpenRegionSelector={openRegionSelector}
-            />
+            <div className="flex items-center justify-between">
+              <SourceSettings
+                captureSources={captureSources}
+                selectedSource={selectedSource}
+                onSourceChange={handleSourceChange}
+                monitorCaptureMode={monitorCaptureMode}
+                onMonitorCaptureModeChange={handleMonitorCaptureModeChange}
+                selectedRegion={selectedRegion}
+                onOpenRegionSelector={openRegionSelector}
+                onTabChange={handleTabChange}
+                onRefresh={loadCaptureSources}
+              />
+            </div>
           </CardContent>
 
           <CardContent className="flex flex-col gap-y-4">

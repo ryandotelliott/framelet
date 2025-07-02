@@ -66,13 +66,9 @@ impl CaptureSourceManager {
 
         let mut window_info = Vec::new();
         for (id, window) in windows.iter().enumerate() {
-            if !window.is_valid() {
-                continue;
-            }
-
             let title = match window.title() {
-                Ok(t) if !t.trim().is_empty() => t,
-                _ => continue,
+                Ok(t) => t,
+                Err(_) => continue,
             };
 
             let hwnd = window.as_raw_hwnd() as isize;

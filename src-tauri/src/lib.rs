@@ -1,11 +1,9 @@
-// Core application modules
 pub mod capture;
 pub mod commands;
 pub mod recording;
 pub mod types;
 pub mod window;
 
-// Re-export commonly used types
 pub use types::*;
 
 use std::sync::Mutex;

@@ -1,11 +1,9 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Instant,
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
 };
 
+use windows::Win32::{Foundation::HWND, UI::WindowsAndMessaging::IsIconic};
 use windows_capture::{
     capture::{Context, GraphicsCaptureApiHandler},
     encoder::{AudioSettingsBuilder, ContainerSettingsBuilder, VideoEncoder, VideoSettingsBuilder},
@@ -32,7 +30,6 @@ pub struct RecordingConfig {
 // Handles capture events.
 pub struct ScreenRecorder {
     encoder: Option<VideoEncoder>,
-    start: Instant,
     stop_signal: Arc<AtomicBool>,
     region: Option<Region>,
 }
@@ -63,7 +60,6 @@ impl GraphicsCaptureApiHandler for ScreenRecorder {
 
         Ok(Self {
             encoder: Some(encoder),
-            start: Instant::now(),
             stop_signal: ctx.flags.stop_signal,
             region: ctx.flags.region,
         })
@@ -156,15 +152,26 @@ pub fn get_available_windows() -> Result<Vec<Window>, Box<dyn std::error::Error>
     let filtered_windows: Vec<Window> = windows
         .into_iter()
         .filter(|window| {
+            if !window.is_valid() {
+                return false;
+            }
+
+            let raw_hwnd = window.as_raw_hwnd();
+            let hwnd = HWND(raw_hwnd);
+
+            // Check if the window is minimized
+            let is_iconic = unsafe { IsIconic(hwnd) };
+            if is_iconic.as_bool() {
+                return false;
+            }
+
             // Check if window has a title and is not minimized
             if let Ok(title) = window.title() {
-                if !title.trim().is_empty() {
-                    // Check if window is visible (not minimized)
-                    // The windows-capture library should handle this, but we can add additional checks
-                    return true;
+                if title.trim().is_empty() {
+                    return false;
                 }
             }
-            false
+            true
         })
         .collect();
 
