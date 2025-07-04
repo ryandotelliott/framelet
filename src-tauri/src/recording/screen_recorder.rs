@@ -14,7 +14,7 @@ use windows_capture::{
     WindowsCaptureGraphicsCaptureItem,
 };
 
-use crate::types::Region;
+use crate::recording::types::Region;
 
 // TODO: Audio capture - use wasapi-rs with `send_frame_with_audio` or `send_audio_buffer` in windows-capture
 

@@ -1,5 +1,5 @@
 use crate::{
-    types::Region,
+    recording::types::Region,
     window::{
         close_region_selector as close_region_selector_handler,
         open_region_selector as open_region_selector_handler,

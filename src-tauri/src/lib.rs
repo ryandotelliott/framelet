@@ -1,10 +1,7 @@
 pub mod capture;
 pub mod commands;
 pub mod recording;
-pub mod types;
 pub mod window;
-
-pub use types::*;
 
 use std::sync::Mutex;
 use tauri::Manager;

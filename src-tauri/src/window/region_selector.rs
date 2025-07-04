@@ -1,4 +1,4 @@
-use crate::types::Region;
+use crate::recording::types::Region;
 use std::os::raw::c_void;
 use tauri::{Emitter, Manager};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};

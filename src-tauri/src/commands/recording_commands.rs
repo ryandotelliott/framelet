@@ -6,8 +6,9 @@ use tauri::State;
 use windows_capture::{monitor::Monitor, window::Window, WindowsCaptureGraphicsCaptureItem};
 
 use crate::{
+    capture::types::CaptureSourceType,
+    recording::types::Region,
     recording::{start_recording as start_screen_recording, RecordingSession},
-    types::{CaptureSourceType, Region},
 };
 
 /// Starts a new recording session
