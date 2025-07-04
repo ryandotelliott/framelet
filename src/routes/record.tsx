@@ -9,7 +9,6 @@ import { OutputSettings } from '@/components/OutputSettings';
 import { AudioSettings } from '@/components/AudioSettings';
 import { WebcamSettings } from '@/components/WebcamSettings';
 import { CaptureSource, Region } from '@/types/recording';
-import { RefreshCw } from 'lucide-react';
 
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);
