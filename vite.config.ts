@@ -40,7 +40,7 @@ export default defineConfig(async () => ({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        regionSelector: path.resolve(__dirname, 'src/windows/region-selector/index.html'),
+        regionSelector: path.resolve(__dirname, 'src/panels/region-selector/index.html'),
       },
     },
   },

@@ -6,6 +6,9 @@ let startY = 0;
 let currentX = 0;
 let currentY = 0;
 
+// Get the DPI scaling factor
+const dpiScale = window.devicePixelRatio || 1;
+
 const overlay = document.getElementById('selection-overlay') as HTMLElement;
 const coordinates = document.getElementById('coordinates') as HTMLElement;
 const cancelBtn = document.getElementById('cancel-btn') as HTMLButtonElement;
@@ -25,13 +28,15 @@ document.addEventListener('visibilitychange', () => {
 
 function startSelection(e: MouseEvent) {
   isSelecting = true;
-  startX = e.clientX;
-  startY = e.clientY;
+  // Apply DPI scaling to get actual screen coordinates
+  startX = Math.round(e.pageX * dpiScale);
+  startY = Math.round(e.pageY * dpiScale);
   currentX = startX;
   currentY = startY;
 
-  overlay.style.left = `${startX}px`;
-  overlay.style.top = `${startY}px`;
+  // Use unscaled coordinates for visual display
+  overlay.style.left = `${e.pageX}px`;
+  overlay.style.top = `${e.pageY}px`;
   overlay.style.width = '0px';
   overlay.style.height = '0px';
   overlay.classList.remove('hidden');
@@ -42,18 +47,19 @@ function startSelection(e: MouseEvent) {
 function updateSelection(e: MouseEvent) {
   if (!isSelecting) return;
 
-  currentX = e.clientX;
-  currentY = e.clientY;
+  // Apply DPI scaling to get actual screen coordinates
+  currentX = Math.round(e.pageX * dpiScale);
+  currentY = Math.round(e.pageY * dpiScale);
+  // Use unscaled coordinates for visual display
+  const displayLeft = Math.min(startX / dpiScale, currentX / dpiScale);
+  const displayTop = Math.min(startY / dpiScale, currentY / dpiScale);
+  const displayWidth = Math.abs(currentX / dpiScale - startX / dpiScale);
+  const displayHeight = Math.abs(currentY / dpiScale - startY / dpiScale);
 
-  const left = Math.min(startX, currentX);
-  const top = Math.min(startY, currentY);
-  const width = Math.abs(currentX - startX);
-  const height = Math.abs(currentY - startY);
-
-  overlay.style.left = `${left}px`;
-  overlay.style.top = `${top}px`;
-  overlay.style.width = `${width}px`;
-  overlay.style.height = `${height}px`;
+  overlay.style.left = `${displayLeft}px`;
+  overlay.style.top = `${displayTop}px`;
+  overlay.style.width = `${displayWidth}px`;
+  overlay.style.height = `${displayHeight}px`;
 
   updateCoordinatesDisplay();
 }
@@ -64,7 +70,7 @@ function updateCoordinatesDisplay() {
   const width = Math.abs(currentX - startX);
   const height = Math.abs(currentY - startY);
 
-  coordinates.textContent = `X: ${left}, Y: ${top}, Width: ${width}, Height: ${height}`;
+  coordinates.textContent = `X: ${left}, Y: ${top}, Width: ${width}, Height: ${height} (DPI: ${dpiScale})`;
 }
 
 async function endSelection() {

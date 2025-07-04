@@ -1,32 +1,13 @@
-use crate::screen_recorder;
-use crate::types::{CaptureSource, CaptureSourceType, MonitorInfo, WindowInfo};
-use serde::Serialize;
-use thiserror::Error;
+use super::sources::{CaptureSourceError, MonitorInfo, WindowInfo};
+use crate::recording::screen_recorder;
+use crate::types::{CaptureSource, CaptureSourceType};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, HMONITOR, MONITORINFO};
-use windows_capture::monitor::Monitor;
-use windows_capture::WindowsCaptureGraphicsCaptureItem;
+use windows_capture::{monitor::Monitor, WindowsCaptureGraphicsCaptureItem};
 
 pub struct CaptureSourceManager;
 
-#[derive(Debug, Error)]
-pub enum CaptureSourceError {
-    #[error("failed to list monitors: {0}")]
-    ListMonitors(#[source] windows_capture::monitor::Error),
-
-    #[error("failed to list windows: {0}")]
-    ListWindows(#[source] Box<dyn std::error::Error>),
-}
-
-impl Serialize for CaptureSourceError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
 impl CaptureSourceManager {
+    /// Gets all available monitors
     pub fn get_monitors() -> Result<Vec<MonitorInfo>, CaptureSourceError> {
         let monitors = Monitor::enumerate().map_err(CaptureSourceError::ListMonitors)?;
 
@@ -78,19 +59,16 @@ impl CaptureSourceManager {
         Ok(monitor_info)
     }
 
+    /// Gets all available windows
     pub fn get_windows() -> Result<Vec<WindowInfo>, CaptureSourceError> {
-        let windows = screen_recorder::get_available_windows()
-            .map_err(|e| CaptureSourceError::ListWindows(e))?;
+        let windows =
+            screen_recorder::get_available_windows().map_err(CaptureSourceError::ListWindows)?;
 
         let mut window_info = Vec::new();
         for (id, window) in windows.iter().enumerate() {
-            if !window.is_valid() {
-                continue;
-            }
-
             let title = match window.title() {
-                Ok(t) if !t.trim().is_empty() => t,
-                _ => continue,
+                Ok(t) => t,
+                Err(_) => continue,
             };
 
             let hwnd = window.as_raw_hwnd() as isize;
@@ -120,6 +98,7 @@ impl CaptureSourceManager {
         Ok(window_info)
     }
 
+    /// Gets all available capture sources (monitors and windows)
     pub fn get_all_capture_sources() -> Result<Vec<CaptureSource>, CaptureSourceError> {
         let mut sources = Vec::new();
 

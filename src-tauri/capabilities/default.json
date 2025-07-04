@@ -22,6 +22,7 @@
     "core:window:allow-start-dragging",
     "core:window:allow-toggle-maximize",
     "core:window:default",
+    "core:path:allow-resolve-directory",
     "decorum:allow-show-snap-overlay",
     "dialog:default",
     "opener:default"

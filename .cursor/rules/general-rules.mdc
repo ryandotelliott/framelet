@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+---
+
+- Packages should be installed using PNPM as the package manager.
+- Do not attempt to run the code, you can build the code using `pnpm tauri build`, but you should not attempt to run `pnpm tauri dev` or `pnpm dev`.
