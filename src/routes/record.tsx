@@ -8,7 +8,7 @@ import { SourceSettings } from '@/components/SourceSettings';
 import { OutputSettings } from '@/components/OutputSettings';
 import { AudioSettings } from '@/components/AudioSettings';
 import { WebcamSettings } from '@/components/WebcamSettings';
-import { CaptureSource, Region } from '@/types/recording';
+import { CaptureSource, Region, Webcam } from '@/types';
 
 export default function RecordPage() {
   const [captureSources, setCaptureSources] = useState<CaptureSource[]>([]);

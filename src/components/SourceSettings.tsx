@@ -2,7 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { CropIcon, MonitorIcon, AppWindowMacIcon, RefreshCw } from 'lucide-react';
-import { CaptureSource, Region } from '@/types/recording';
+import { CaptureSource, Region } from '@/types';
 import { useEffect, useState } from 'react';
 
 interface SourceSettingsProps {
