@@ -9,8 +9,8 @@ use tauri_plugin_decorum::WebviewWindowExt;
 
 use crate::{
     commands::{
-        close_region_selector, get_capture_sources, open_region_selector, region_selected,
-        start_recording, stop_recording,
+        close_region_selector, get_capture_sources, get_webcams, open_region_selector,
+        region_selected, start_recording, stop_recording,
     },
     recording::RecordingSession,
 };
@@ -24,6 +24,7 @@ pub fn run() {
         .manage(Mutex::new(None::<RecordingSession>))
         .invoke_handler(tauri::generate_handler![
             get_capture_sources,
+            get_webcams,
             start_recording,
             stop_recording,
             open_region_selector,

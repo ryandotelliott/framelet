@@ -21,16 +21,17 @@ export default function RecordPage() {
   /* ---------------------------------- Audio ---------------------------------- */
   const [recordAudio, setRecordAudio] = useState(false);
   const [audioSource, setAudioSource] = useState('');
-  const audioSourcesList = useMemo(() => ['All System Audio'], []);
+  const audioSourcesList = useMemo(() => [''], []);
 
   const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
   const [inputSource, setInputSource] = useState('');
-  const microphoneSourcesList = useMemo(() => ['Default - Microphone'], []);
+  const microphoneSourcesList = useMemo(() => [''], []);
 
   /* --------------------------------- Webcam ---------------------------------- */
   const [enableWebcam, setEnableWebcam] = useState(false);
   const [webcamSource, setWebcamSource] = useState('');
-  const webcamSourcesList = useMemo(() => ['Logitech 4K Webcam'], []);
+  const [webcams, setWebcams] = useState<Webcam[]>([]);
+  const webcamSourcesList = useMemo(() => webcams.map((w) => w.name), [webcams]);
 
   const [monitorCaptureMode, setMonitorCaptureMode] = useState<'full' | 'custom'>('full');
 
@@ -46,8 +47,18 @@ export default function RecordPage() {
     }
   }, []);
 
+  const loadWebcams = useCallback(async () => {
+    try {
+      const webcams = await invoke<Webcam[]>('get_webcams');
+      setWebcams(webcams);
+    } catch (error) {
+      console.error('Error loading webcams:', error);
+    }
+  }, []);
+
   useEffect(() => {
     loadCaptureSources();
+    loadWebcams();
 
     // Listen for region selection events
     const unlistenRegionSelected = listen<Region>('region-selected', (event) => {
